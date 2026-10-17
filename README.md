@@ -32,3 +32,7 @@ Defina `VITE_ASSETS_BASE_URL` e suba os arquivos seguindo [docs/ASSETS.md](docs/
 ## Publicar
 
 É um site estático (`dist/`): funciona no Vercel, no Cloudflare Pages ou no Netlify. Configure as mesmas variáveis `VITE_*` no painel da hospedagem.
+
+## Personagens 3D e danças
+
+Abra **Estúdio 3D** para criar um visual a partir de presets, experimentar danças e comprar skins/animações com moedas do jogo. O personagem equipado dança no menu Jogar. Para ativar o catálogo online, aplique também a nova migração de personagens. Detalhes e limites em [docs/CHARACTER_STUDIO.md](docs/CHARACTER_STUDIO.md).
