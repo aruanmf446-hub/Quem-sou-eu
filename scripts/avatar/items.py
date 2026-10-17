@@ -82,6 +82,13 @@ class ItemBuilder:
         m = self.model
         pos = np.asarray(pos, float)
         tris = np.asarray(tris)
+        if rigid and bone and surface is None:
+            # Peça rígida presa a um osso: os morphs (proporções) vêm só da pele desse osso. Sem isso, um
+            # cajado longo herdaria a média de cabeça, tronco e pernas e se descolaria da mão.
+            dom = np.argmax(m.weights, 1)
+            own = m.body_tris[(dom[m.body_tris] == m.bone_index(bone)).all(1)]
+            if len(own):
+                surface = own
         ids, bary, _ = m.bind(pos, surface)
         if bone:
             W = np.zeros((len(pos), len(m.bone_names)), np.float32)

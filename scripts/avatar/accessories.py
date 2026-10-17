@@ -93,7 +93,7 @@ def cylinder(center, axis, radius, height, seg=24, caps=True):
                 nrm.append(axis * sgn)
             for i in range(seg):
                 a, b = base + 1 + i, base + 1 + (i + 1) % seg
-                tris.append((base, b, a) if sgn > 0 else (base, a, b))
+                tris.append((base, a, b) if sgn > 0 else (base, b, a))
     return np.array(pos), np.array(nrm), np.array(tris)
 
 

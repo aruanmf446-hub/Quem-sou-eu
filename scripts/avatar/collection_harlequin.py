@@ -811,8 +811,16 @@ def smiling_bomb(model, layout, item_id='prop_bomb'):
         n = -n
     palm = hand + (mid - hand) * .6
     R = .056
-    center = palm + n * (R + .028)
-    F = fwd - n * (fwd @ n)
+    # Apoiada entre o polegar e o indicador, à frente da mão: na pose parada a palma fica voltada
+    # para a coxa e a bomba atravessaria a perna se ficasse no centro da palma.
+    thumb = hd['RightHandThumb2'] - palm
+    thumb -= fwd * (thumb @ fwd)
+    thumb /= np.linalg.norm(thumb)
+    center = palm + thumb * (R * .85) + n * (R * .55) + fwd * .012
+    # Tampa e pavio para cima na pose parada (contra o sentido dos dedos); a carinha olha para a frente.
+    n = -fwd + thumb * .5
+    n /= np.linalg.norm(n)
+    F = thumb - n * (thumb @ n)
     F /= np.linalg.norm(F)
     pos, nrm, uv, tris = uv_sphere(center, R, F, n)
     tex = b.glb.texture(bomb_texture(), fmt='webp', quality=92)

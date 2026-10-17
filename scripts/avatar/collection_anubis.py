@@ -2,7 +2,7 @@
 saiote cerimonial, manto, braceletes, grevas e cetro solar.
 
 Formas orgânicas (cabeça de chacal, orelhas, cetro) são modeladas por campos de
-distância com união suave e extraídas por marching cubes; roupas derivam da
+distância com união suave e extraídas por surface nets (isosurface.py); roupas derivam da
 anatomia (pesos e morphs transferidos automaticamente).
 """
 from __future__ import annotations
@@ -63,16 +63,16 @@ def sd_box(p, c, half, r=0.0):
 
 
 def implicit_mesh(fn, lo, hi, step=.0025, err=.0004):
-    """Extrai a isosuperfície 0 de fn (pontos (N,3) -> distâncias) por marching cubes."""
-    from skimage.measure import marching_cubes
+    """Extrai a isosuperfície 0 de fn (pontos (N,3) -> distâncias) por surface nets."""
+    from isosurface import orient, surface_nets
     lo, hi = np.asarray(lo, float), np.asarray(hi, float)
     n = np.ceil((hi - lo) / step).astype(int) + 1
     xs = [np.linspace(lo[i], lo[i] + (n[i] - 1) * step, n[i]) for i in range(3)]
     X, Y, Z = np.meshgrid(*xs, indexing='ij')
     pts = np.stack([X, Y, Z], -1).reshape(-1, 3)
     vals = fn(pts).reshape(n)
-    verts, faces, _, _ = marching_cubes(vals, 0.0, spacing=(step, step, step))
-    verts = verts + lo
+    verts, faces = surface_nets(vals, step, lo)
+    faces = orient(verts, faces, fn, step * .25)
     if err:
         used, faces = simplify(verts, faces, .02, err)
         verts = verts[used]
@@ -652,8 +652,399 @@ def bracers_gold(model, layout, item_id='bracers_gold'):
     return b.save({})
 
 
+# --------------------------------------------------------------------------- saiote (shendyt)
+
+def _body_back(model):
+    """Função z_trás(x, y): o ponto mais posterior do corpo (alisado) em cada coluna."""
+    from scipy.spatial import cKDTree
+    sm = model.smoothed()[:13380]
+    tree = cKDTree(sm[:, :2])
+
+    def back(x, y, r=.03):
+        out = np.zeros(len(x))
+        for i, (a, c) in enumerate(zip(x, y)):
+            ids = tree.query_ball_point((a, c), r)
+            out[i] = sm[ids, 2].min() if ids else 0.0
+        return out
+    return back
+
+
+def _grid_tris(R, C, closed=False):
+    tris = []
+    for r in range(R - 1):
+        for c in range(C if closed else C - 1):
+            a, b_ = r * C + c, r * C + (c + 1) % C
+            tris += [(a, a + C, b_), (b_, a + C, b_ + C)]
+    return np.array(tris)
+
+
+def _push_body(model, P, clearance, iters=10):
+    sm = model.smoothed()
+    for _ in range(iters):
+        ids, bary, off = model.bind(P, coords=sm)
+        n = (model.normals[ids] * bary[..., None]).sum(1)
+        n /= np.linalg.norm(n, axis=1, keepdims=True)
+        d = (off * n).sum(1)
+        cl = clearance(P) if callable(clearance) else clearance
+        if (d >= cl - 1e-5).all():
+            break
+        P = P + n * np.clip(cl - d, 0, None)[:, None]
+    return P
+
+
+def _skirt_weights(model, pos, hips_mix):
+    ids, bary, _ = model.bind(pos)
+    W = model.bound_weights(ids, bary).astype(np.float32)
+    keep = np.isin(model.bone_names, ('Hips', 'Spine', 'LeftUpLeg', 'RightUpLeg'))
+    W[:, ~keep] = 0
+    W /= np.maximum(W.sum(1, keepdims=True), 1e-9)
+    H = np.zeros_like(W)
+    H[:, model.bone_index('Hips')] = 1
+    k = np.asarray(hips_mix)[:, None]
+    morphs = {k_: v for k_, v in model.bound_morphs(ids, bary).items() if not k_.startswith('expr_') and np.abs(v).max() > 5e-4}
+    return W * (1 - k) + H * k, morphs
+
+
+def bottom_shendyt(model, layout, item_id='bottom_shendyt'):
+    """Saiote de linho pregueado até o meio da coxa, cinto de ouro e lápis e avental central listrado."""
+    from collection_volt import profile, ring_band
+    b = ItemBuilder(model, item_id, 'bottom')
+    hips = model.heads['Hips']
+    y_top = hips[1] + .055
+    knee_y = model.heads['LeftLeg'][1]
+    y_hem = knee_y + .16
+    R, C = 26, 120
+    ang = np.linspace(-np.pi, np.pi, C, endpoint=False)
+    d = np.stack([np.sin(ang), np.zeros(C), np.cos(ang)], 1)
+    c0 = np.array([0, 0, hips[2]])
+    rows = []
+    for i, t in enumerate(np.linspace(0, 1, R)):
+        y = y_top + (y_hem - y_top) * t
+        # Cone: começa justo na cintura e abre para cobrir as coxas com folga.
+        rx = .16 + .1 * t ** .8
+        rz = .13 + .05 * t ** .8
+        rows.append(c0 + np.array([0, y, 0]) + d * np.array([rx, 0, rz]))
+    P = np.vstack(rows)
+    P = _push_body(model, P, .016)
+    G3 = P.reshape(R, C, 3)
+    # Envelope convexo por linha (o tecido não entra entre as pernas).
+    for i in range(R):
+        rel = G3[i] - c0
+        rad = np.linalg.norm(rel[:, [0, 2]], axis=1)
+        for _ in range(6):
+            rad = np.maximum(rad, (np.roll(rad, 1) + np.roll(rad, -1)) / 2)
+        G3[i, :, 0] = c0[0] + np.sin(ang) * rad
+        G3[i, :, 2] = c0[2] + np.cos(ang) * rad
+    for i in range(1, R):
+        # Caimento: nenhuma linha fica mais estreita que a de cima.
+        r_up = np.linalg.norm((G3[i - 1] - c0)[:, [0, 2]], axis=1)
+        r_now = np.linalg.norm((G3[i] - c0)[:, [0, 2]], axis=1)
+        r_new = np.maximum(r_now, r_up + .001)
+        G3[i, :, 0] = c0[0] + np.sin(ang) * r_new
+        G3[i, :, 2] = c0[2] + np.cos(ang) * r_new
+    # Pregas finas (mais fundas na barra).
+    t = np.linspace(0, 1, R)[:, None]
+    pleat = np.abs(np.sin(ang[None] * 30)) * .005 * (.25 + t) - .003 * (.25 + t)
+    G3[..., 0] += np.sin(ang)[None] * pleat
+    G3[..., 2] += np.cos(ang)[None] * pleat
+    pos = G3.reshape(-1, 3)
+    tris = _grid_tris(R, C, closed=True)
+    nrm = vertex_normals(pos, tris)
+    if ((pos - np.array([0, pos[:, 1].mean(), c0[2]])) * nrm).sum() < 0:
+        tris = tris[:, ::-1]
+        nrm = -nrm
+    uv = np.stack([np.tile(np.arange(C) / C, R) * 6, np.repeat(np.linspace(0, 1, R), C)], 1)
+    # Linho: pregas sombreadas na textura (claro/escuro alternado) e barra dourada.
+    size = 512
+    yy, xx = np.mgrid[0:size, 0:size] / size
+    lum = .92 + .06 * np.cos(xx * 2 * np.pi * 5) + .03 * (fbm(np.stack([xx.ravel() * 40, yy.ravel() * 4, np.zeros(size * size)], 1), 1, 2, 3).reshape(size, size) - .5)
+    hem = yy > .93
+    col = np.repeat(lum[..., None], 3, 2) * cloth.srgb(LINEN)
+    col = np.where(hem[..., None], cloth.srgb(GOLD), col)
+    col = np.where(((yy > .9) & (yy <= .93))[..., None], cloth.srgb(LAPIS), col)
+    orm = np.zeros((size, size, 3))
+    orm[..., 0] = 1
+    orm[..., 1] = np.where(hem, .3, .8)
+    orm[..., 2] = np.where(hem, .95, 0)
+    alb = Image.fromarray((np.clip(col, 0, 1) * 255).astype(np.uint8), 'RGB')
+    ormi = Image.fromarray((orm * 255).astype(np.uint8), 'RGB')
+    linen = b.glb.material('linen', base=b.glb.texture(alb, fmt='jpeg', quality=88), orm=b.glb.texture(ormi, fmt='png'),
+                           normal=b.glb.texture(noise_normal(256, 30, 1.2, 5), fmt='png'), normal_scale=.6,
+                           metallic=1.0, roughness=1.0, sheen=((.6, .58, .5), .6), double=True)
+    t_row = np.repeat(np.linspace(0, 1, R), C)
+    W, morphs = _skirt_weights(model, pos, .25 + .35 * t_row)
+    emit(b, 'skirt', pos, nrm, uv, tris, linen, W, morphs)
+    # Cinto de ouro e lápis na cintura.
+    ax, u, v = np.array([0, 1., 0]), np.array([0, 0, 1.]), np.array([1., 0, 0])
+    belt_c = np.array([0, y_top - .02, c0[2]])
+    rad = profile(G3[:4].reshape(-1, 3), belt_c, ax, u, v, 72, .03) + .003
+    bpos, bnrm, btris = ring_band(belt_c, ax, u, v, rad, .045, .004)
+    bmat = band_material(b, 'belt', [GOLD, LAPIS, GOLD, LAPIS, GOLD], [.2, .2, .2, .2, .2], [.95, .05, .95, .05, .95], [.28, .3, .28, .3, .28])
+    buv = np.stack([np.full(len(bpos), .5), np.clip((bpos[:, 1] - (belt_c[1] - .0225)) / .045, 0, 1)], 1)
+    Wb, mb = _skirt_weights(model, bpos, np.ones(len(bpos)))
+    emit(b, 'belt', bpos, bnrm, 1 - buv, btris, bmat, Wb, mb)
+    # Avental central: trapézio em faixas de ouro e lápis caindo da fivela.
+    front = rad[36] + belt_c[2] + .004
+    rows_a = 14
+    ap = []
+    for i, t in enumerate(np.linspace(0, 1, rows_a)):
+        y = belt_c[1] - .02 + (y_hem - .02 - (belt_c[1] - .02)) * t
+        hw = .045 + .03 * t
+        j = int(np.argmin(np.abs(G3[:, 36, 1] - y)))
+        z = max(G3[j, 58:63, 2].max(), front - .002) + .006
+        ap.append([(x, y, z + .004 * np.cos(x / hw * np.pi / 2)) for x in np.linspace(-hw, hw, 7)])
+    apos = np.array(ap).reshape(-1, 3)
+    atris = _grid_tris(rows_a, 7)
+    anrm = vertex_normals(apos, atris)
+    if anrm[:, 2].mean() < 0:
+        atris = atris[:, ::-1]
+        anrm = -anrm
+    auv = np.stack([np.full(len(apos), .5), np.repeat(np.linspace(0, 1, rows_a), 7)], 1)
+    amat = band_material(b, 'apron', [GOLD, LAPIS, GOLD, '#b8332a', GOLD, LAPIS], [.08, .14, .06, .1, .06, .14], [.95, .05, .95, .05, .95, .05], [.28, .3, .28, .4, .28, .3])
+    Wa, ma = _skirt_weights(model, apos, np.full(len(apos), .8))
+    emit(b, 'apron', apos, anrm, auv, atris, amat, Wa, ma)
+    return b.save({'hides': ['hips', 'thigh_a']})
+
+
+# --------------------------------------------------------------------------- manto noturno
+
+def back_cape_night(model, layout, item_id='back_cape_night'):
+    """Manto azul-noite preso aos ombros, caindo até a panturrilha, com barra dourada e fechos de escaravelho."""
+    b = ItemBuilder(model, item_id, 'back')
+    back_z = _body_back(model)
+    sh = model.heads['LeftArm']
+    neck = model.heads['Neck']
+    R, C = 34, 41
+    y_top = sh[1] + .07
+    y_bot = model.heads['LeftLeg'][1] - .16
+    xs = np.linspace(-1, 1, C)
+    G3 = np.zeros((R, C, 3))
+    for i, t in enumerate(np.linspace(0, 1, R)):
+        y = y_top + (y_bot - y_top) * t ** 1.05
+        half = .2 + .17 * t ** .7
+        x = xs * half
+        G3[i, :, 0] = x
+        G3[i, :, 1] = y - .04 * np.abs(xs) ** 2 * (1 - t)
+    # Profundidade: rente às costas no alto, cai reta (não entra na lombar) e abre um pouco para trás.
+    flat = G3.reshape(-1, 3)
+    bz = back_z(flat[:, 0], flat[:, 1]).reshape(R, C)
+    z = np.zeros((R, C))
+    for i in range(R):
+        cand = bz[i] - .045
+        z[i] = cand if i == 0 else np.minimum(cand, z[i - 1] - .004)
+    G3[..., 2] = z
+    # Ombros: a borda de cima contorna os ombros e chega à frente (onde ficam os fechos).
+    top = G3[0].copy()
+    for j in range(C):
+        sx = xs[j]
+        if abs(sx) > .55:
+            k = (abs(sx) - .55) / .45
+            G3[0, j, 2] = top[j, 2] + k * .16
+            G3[0, j, 1] = top[j, 1] - k * .02
+    for i in range(1, 6):
+        w = 1 - i / 6
+        G3[i, :, 2] = G3[i, :, 2] * (1 - w * .5) + G3[0, :, 2] * w * .5
+    pos = _push_body(model, G3.reshape(-1, 3), .03).reshape(R, C, 3)
+    # Pregas verticais que se abrem para baixo.
+    t = np.linspace(0, 1, R)[:, None]
+    pos[..., 2] -= np.abs(np.sin(xs[None] * np.pi * 4.5)) * .018 * t ** 1.2
+    pos = pos.reshape(-1, 3)
+    tris = _grid_tris(R, C)
+    nrm = vertex_normals(pos, tris)
+    if nrm[:, 2].mean() > 0:
+        tris = tris[:, ::-1]
+        nrm = -nrm
+    uv = np.stack([np.tile(xs * .5 + .5, R), np.repeat(np.linspace(0, 1, R), C)], 1)
+    # Pesos: no alto segue ombros e tórax; para baixo, coluna e quadril (o manto não estica com as pernas).
+    ids, bary, _ = model.bind(pos)
+    W = model.bound_weights(ids, bary).astype(np.float32)
+    keep = np.isin(model.bone_names, ('Spine1', 'Spine2', 'Neck', 'LeftShoulder', 'RightShoulder'))
+    W[:, ~keep] = 0
+    W /= np.maximum(W.sum(1, keepdims=True), 1e-9)
+    tr = np.repeat(np.linspace(0, 1, R), C)
+    H = np.zeros_like(W)
+    H[:, model.bone_index('Spine2')] = .45
+    H[:, model.bone_index('Spine1')] = .3
+    H[:, model.bone_index('Hips')] = .25
+    k = smoothstep(.05, .35, tr)[:, None]
+    W = W * (1 - k) + H * k
+    morphs = {kk: v for kk, v in model.bound_morphs(ids, bary).items() if not kk.startswith('expr_') and np.abs(v).max() > 5e-4}
+    morphs = {kk: v * (1 - k) for kk, v in morphs.items()}
+    # Materiais: corpo recolorível (textura neutra) e barra dourada separada.
+    size = 512
+    yy, xx = np.mgrid[0:size, 0:size] / size
+    pts = np.stack([xx.ravel() * 6, yy.ravel() * 10, np.zeros(size * size)], 1)
+    lum = np.clip(.8 + .15 * (fbm(pts, 1, 3, 8).reshape(size, size) - .5) + .06 * np.cos(xx * 2 * np.pi * 4.5), 0, 1)
+    alb = Image.fromarray((np.repeat(lum[..., None], 3, 2) * 255).astype(np.uint8), 'RGB')
+    cape = b.glb.material('cape', color=(*lin(NIGHT), 1), base=b.glb.texture(alb, fmt='jpeg', quality=85), roughness=.75,
+                          sheen=((.1, .11, .2), .6), double=True, extras={'tint': 'main'})
+    rr = tris // C
+    cc = tris % C
+    border = (rr.max(1) >= R - 2) | (cc.min(1) <= 0) | (cc.max(1) >= C - 1)
+    emit(b, 'cape', pos, nrm, uv, tris[~border], cape, W, morphs)
+    gold = gold_mat(b, 'trim')
+    emit(b, 'trim', pos, nrm, uv, tris[border], gold, W, morphs)
+    # Fechos: discos de ouro com escaravelho de lápis na frente dos ombros.
+    lap = flat_material(b, 'lapis', LAPIS, roughness=.3, clearcoat=(.8, .1))
+    for j in (0, C - 1):
+        c = G3[0, j] + np.array([0, -.01, .0])
+        c = _push_body(model, c[None], .03)[0]
+        n = np.array([np.sign(c[0]) * .3, .4, 1.])
+        n /= np.linalg.norm(n)
+        for name, mat_, fn_ in ((f'clasp_{j}', gold, disk_sdf(c, n, .026, .004, rim=True)),
+                                 (f'scarab_{j}', lap, lambda p, c=c + n * .005: sd_ellipsoid(p, c, np.array([.012, .016, .007])))):
+            V2, N2, F2 = implicit_mesh(fn_, c - .035, c + .035, .0012, err=.0002)
+            W2 = bone_weights(model, len(V2), [('Spine2', 1)])
+            emit(b, name, V2, N2, np.zeros((len(V2), 2)), F2, mat_, W2, {})
+    return b.save({})
+
+
+# --------------------------------------------------------------------------- grevas douradas
+
+def shoes_gold_greaves(model, layout, item_id='shoes_gold_greaves'):
+    """Sandálias de couro com tiras douradas e grevas de ouro com faixas de lápis até abaixo do joelho."""
+    from wardrobe import foot_frame, shoe_shell, sole_mesh
+    A = G.Anatomy(model)
+    G.reset_strips()
+    s = shoe_shell(model, layout, A, collar_t=.18, ease=.006)
+    knee_y, ankle_y = A.h['LeftLeg'][1], A.h['LeftFoot'][1]
+    top_y = knee_y + (ankle_y - knee_y) * .18
+    k = smoothstep(ankle_y + .05, top_y - .02, s.pos[:, 1]) * (s.part < 1.5)
+    G.offset(model, s, .006 * k)
+    G.smooth(s, 2, keep_boundary=True)
+    s.pos[:, 1] = np.maximum(s.pos[:, 1], .016)
+    b = ItemBuilder(model, item_id, 'shoes')
+    bake = cloth.bake_surface(s, 1024, extra={'P': s.pos})
+    p = bake.at('P').astype(np.float64)
+    part = bake.at('part')[:, 0]
+    y = p[:, 1]
+    leather = cloth.srgb('#4a2a17') * (1 + .12 * (fbm(p, 30, 3, 5) - .5))[:, None]
+    gold, lapis = cloth.srgb(GOLD), cloth.srgb(LAPIS)
+    greave = smoothstep(ankle_y + .03, ankle_y + .05, y)
+    # Tiras da sandália: diagonais cruzadas no peito do pé.
+    straps = np.zeros(len(p))
+    for side, sign in (('Left', 1), ('Right', -1)):
+        ankle, f, lat = foot_frame(A, side)
+        m = np.sign(p[:, 0]) == sign
+        fw, lt = (p - ankle) @ f, (p - ankle) @ lat
+        diag = np.minimum(np.abs(((fw + lt) * 30) % 1 - .5), np.abs(((fw - lt) * 30) % 1 - .5))
+        straps[m] = smoothstep(.16, .1, diag[m]) * (fw[m] > -.02)
+    band_y = (y - (ankle_y + .05)) / max(top_y - ankle_y - .05, 1e-6)
+    lap_band = greave * (smoothstep(.04, .02, np.abs(band_y - .2)) + smoothstep(.04, .02, np.abs(band_y - .55)) + smoothstep(.03, .015, np.abs(band_y - .9)))
+    alb = cloth.lin_mix(leather, gold, np.clip(straps * (1 - greave) + greave, 0, 1))
+    alb = cloth.lin_mix(alb, lapis, np.clip(lap_band, 0, 1))
+    alb = np.where((part > 1.5)[:, None], leather * .6, alb)
+    metal = np.clip((straps * (1 - greave) + greave) * (1 - lap_band), 0, 1) * .92
+    rough = .55 * (1 - metal) + .28 * metal
+
+    def height(q):
+        return (fbm(q, 45, 2, 6) - .5) * .0005 * (1 - greave) + straps * .0006 * (1 - greave) - lap_band * .0005
+    a, nm, orm = cloth.finish(bake, np.clip(alb, 0, 1), rough, height, metal=metal)
+    mat = tex_material(b, 'greaves', a, nm, orm, clearcoat=(.4, .25))
+    b.derived('greaves', s, mat, weight_smooth=2)
+    sole = flat_material(b, 'sole', '#3a2312', roughness=.65)
+    gold_m = gold_mat(b)
+    for side, sign in (('Left', 1), ('Right', -1)):
+        pos, uv, tris, outline, center = sole_mesh(s, sign, y_bottom=-.012, y_top=.018, flare=.004)
+        b.bound(f'sole_{side}', pos, tris, uv, sole, bone=f'{side}Foot')
+        # Aro dourado no alto da greva.
+        m = (np.sign(s.pos[:, 0]) == sign) & (s.part < 1.5)
+        ymax = s.pos[m, 1].max()
+        sel = s.pos[m & (s.pos[:, 1] > ymax - .008)]
+        cc = sel.mean(0)
+        order = np.argsort(np.arctan2(sel[:, 0] - cc[0], sel[:, 2] - cc[2]))
+        ring = sel[order]
+        ring = ring[::max(1, len(ring) // 48)]
+        for _ in range(3):
+            ring = .5 * ring + .25 * (np.roll(ring, 1, 0) + np.roll(ring, -1, 0))
+        from hair import tube_mesh
+        tp, tn, _, tt, _ = tube_mesh([np.vstack([ring, ring[:1]])], [np.full(len(ring) + 1, .004)], sides=8)
+        b.bound(f'rim_{side}', tp, tt, np.zeros((len(tp), 2)), gold_m, nrm=tn, bone=f'{side}Leg')
+    return b.save({'hides': ['feet', 'shin_c', 'shin_d'], 'lift': .013})
+
+
+# --------------------------------------------------------------------------- cetro solar
+
+IDLE_HAND = (np.array([-.303, .925, .082]), [0.265, -0.117, 0.295, 0.91])
+STAFF = {'center': np.array([-.29, .835, .106]), 'idle': .65, 'below': .62, 'above': .95}
+
+
+def prop_sun_staff(model, layout, item_id='prop_sun_staff'):
+    """Cetro de ébano com anéis de ouro e lápis, coroado por um disco solar entre chifres."""
+    from scipy.spatial.transform import Rotation as Rot
+    from accessories import cylinder, merge, torus
+    from collection_astro import frame, grid_mesh
+    from hair import tube_mesh
+    from wardrobe2 import sphere_mesh
+    b = ItemBuilder(model, item_id, 'prop')
+    hand_idle, quat = IDLE_HAND
+    q = Rot.from_quat(quat)
+    g = q.inv().apply(STAFF['center'] - hand_idle) + model.heads['RightHand']
+    u = q.inv().apply([0, 1, 0]) * STAFF['idle'] + np.array([0, 1, 0]) * (1 - STAFF['idle'])
+    u, e1, e2 = frame(u)
+    lo, hi = STAFF['below'], STAFF['above']
+    wood = flat_material(b, 'ebony', '#1a1412', roughness=.35, clearcoat=(.6, .2))
+    rings = []
+    for t in np.linspace(-lo, hi - .12, 30):
+        rad = .0118 + .0025 * (t + lo) / (hi + lo)
+        a = np.linspace(0, 2 * np.pi, 24, endpoint=False)
+        rings.append(g + u * t + rad * (np.cos(a)[:, None] * e1 + np.sin(a)[:, None] * e2))
+    pos, uv, tris = grid_mesh(np.array(rings), closed=True)
+    b.bound('shaft', pos, tris, uv, wood, bone='RightHand', rigid=True)
+    gold = gold_mat(b)
+    lap = flat_material(b, 'lapis', LAPIS, roughness=.3, clearcoat=(.8, .1))
+    gp, lp = [], []
+    for t in (-.09, .09, .35, .5, hi - .2):
+        gp.append(torus(g + u * t, u, .0145, .0035, 24, 8))
+    for t in (.4, .45):
+        lp.append(torus(g + u * t, u, .014, .0045, 24, 8))
+    gp.append(cylinder(g - u * lo, u, .0122, .05, 20))
+    # Topo: colar, cálice e dois chifres curvos que seguram o disco.
+    top = g + u * (hi - .12)
+    gp.append(cylinder(top, u, .02, .03, 24))
+    gp.append(torus(top + u * .03, u, .024, .006, 28, 8))
+    disc_c = top + u * .115
+    for sgn in (1, -1):
+        arc = []
+        for a in np.linspace(0, 1, 26):
+            th = -np.pi / 2 + a * np.pi * .95
+            arc.append(disc_c + (sgn * e1 * np.cos(th) * (.075 + .01 * a) + u * np.sin(th) * .08))
+        arc = np.array(arc)
+        arc[0] = top + u * .035 + sgn * e1 * .012
+        ap, an, _, at, _ = tube_mesh([arc], [np.linspace(.009, .0035, len(arc))], sides=10)
+        gp.append((ap, an, at))
+    # Raios ao redor do disco.
+    for k in range(16):
+        th = 2 * np.pi * k / 16
+        d = np.cos(th) * e1 + np.sin(th) * u
+        L_ = .03 if k % 2 == 0 else .02
+        base = disc_c + d * .05
+        tip = disc_c + d * (.05 + L_)
+        o = np.cross(d, e2) * .006
+        tri = np.array([base + o, tip, base - o, base + e2 * .003])
+        gp.append((tri, np.tile(e2, (4, 1)), np.array([[0, 1, 2], [0, 2, 1], [0, 1, 3], [1, 2, 3], [2, 0, 3]])))
+    gp.append(torus(disc_c, e2, .05, .005, 40, 8))
+    pos, nrm, tris = merge(gp)
+    b.bound('gold', pos, tris, np.zeros((len(pos), 2)), gold, nrm=nrm, bone='RightHand', rigid=True)
+    pos, nrm, tris = merge(lp)
+    b.bound('lapis', pos, tris, np.zeros((len(pos), 2)), lap, nrm=nrm, bone='RightHand', rigid=True)
+    sun = b.glb.material('sun', color=(*lin('#ffb02e'), 1), roughness=.25, emissive=(1.0, .55, .12), clearcoat=(1, .05))
+    sp, sn, st = sphere_mesh(disc_c, 1.0, 28, 18)
+    loc = sp - disc_c
+    # (x, y, z) -> (e1, u, -e2): mantém a orientação (sem espelhar o sentido dos triângulos).
+    sp = disc_c + loc[:, 0:1] * e1 * .046 + loc[:, 1:2] * u * .046 - loc[:, 2:3] * e2 * .018
+    nn = loc[:, 0:1] * e1 / .046 + loc[:, 1:2] * u / .046 - loc[:, 2:3] * e2 / .018
+    nn /= np.linalg.norm(nn, axis=1, keepdims=True)
+    b.bound('sun', sp, st, np.zeros((len(sp), 2)), sun, nrm=nn, bone='RightHand', rigid=True)
+    return b.save({'grip': 'staff', 'hand': 'Right'})
+
+
 def register(item):
     item('mask_anubis', 'headwear')(mask_anubis)
     item('neck_usekh', 'neck')(neck_usekh)
     item('top_anubis_harness', 'top')(top_anubis_harness)
     item('bracers_gold', 'wrist')(bracers_gold)
+    item('bottom_shendyt', 'bottom')(bottom_shendyt)
+    item('back_cape_night', 'back')(back_cape_night)
+    item('shoes_gold_greaves', 'shoes')(shoes_gold_greaves)
+    item('prop_sun_staff', 'prop')(prop_sun_staff)

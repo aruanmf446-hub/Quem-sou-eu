@@ -7,7 +7,7 @@ const root = new URL('../../', import.meta.url).pathname;
 const out = `${root}public/avatar/thumbs`;
 mkdirSync(out, { recursive: true });
 const catalog = readFileSync(`${root}src/avatar/catalog.ts`, 'utf8');
-const items = [...catalog.matchAll(/\{ id: '([\w-]+)', slot: '(\w+)'/g)].map(m => ({ id: m[1], slot: m[2] }));
+const items = [...catalog.matchAll(/\{ id: '([\w-]+)', slot: '(\w+)'[^\n]*/g)].map(m => ({ id: m[1], slot: m[2], hair: /suggestHair: '(#\w+)'/.exec(m[0])?.[1] }));
 const only = process.argv.slice(2);
 const base = { skinTone: '#a8714e', hairColor: '#2b1d14', items: { brows: 'brows_natural' } };
 const HEAD = new Set(['hair', 'brows', 'beard', 'eyewear', 'headwear']);
@@ -16,6 +16,8 @@ function job(item) {
   cfg.items[item.slot] = item.id;
   if (item.id === 'hair_curly_fade') cfg.hairTips = '#e2bf7a';
   if (item.id === 'hair_clown') cfg.hairColor = '#d9481c';
+  if (item.hair) cfg.hairColor = item.hair;
+  if (item.id === 'hair_curly_pigtails') cfg.hairTips = '#2ec4c4';
   if (item.slot === 'bodyart' && item.id.startsWith('facepaint')) cfg.skinTone = '#e9dccf';
   const p = new URLSearchParams({ cfg: JSON.stringify(cfg), transparent: '1', only: item.id, fit: HEAD.has(item.slot) ? 'all' : 'item' });
   if (HEAD.has(item.slot) || item.id.startsWith('facepaint')) { p.set('keepHead', '1'); p.set('az', '.45'); p.set('pad', '1.05'); }
@@ -24,11 +26,13 @@ function job(item) {
   if (item.slot === 'back') { p.set('az', '2.6'); }
   if (item.slot === 'prop' || item.slot === 'hands') { p.set('az', '.4'); p.set('pad', '1.1'); }
   if (item.slot === 'brows') { p.set('az', '.15'); }
+  // Pares (luvas, braçadeiras): sobre o corpo, senão as duas mãos ficam minúsculas no quadro.
+  if (/^(gloves|bracers)_/.test(item.id)) { p.set('keepBody', '1'); p.set('az', '.3'); p.set('pad', '1.05'); }
   return { name: item.id, query: p.toString(), w: 320, h: 320 };
 }
 const jobs = items.filter(i => existsSync(`${root}public/avatar/items/${i.id}.glb`)).map(job);
-const bundles = [...catalog.matchAll(/id: '(street|striker|night-clown)', name: '[^']+'[\s\S]*?config: base\((\{[\s\S]*?\})\),\n  \}/g)];
-for (const id of ['street', 'striker', 'night-clown']) jobs.push({ name: `bundle_${id}`, bundle: id, w: 360, h: 440 });
+const bundleIds = [...catalog.matchAll(/\n    id: '([\w-]+)', name: '[^']+', subtitle:/g)].map(m => m[1]);
+for (const id of bundleIds) jobs.push({ name: `bundle_${id}`, bundle: id, w: 360, h: 440 });
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const page = await browser.newPage({ viewport: { width: 320, height: 320 } });
 page.on('pageerror', e => console.log('[pageerror]', e.message));

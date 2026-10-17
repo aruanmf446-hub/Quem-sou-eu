@@ -830,8 +830,9 @@ def gloves_fingerless(model, layout, item_id='gloves_fingerless'):
     G.smooth(s, 2, keep_boundary=True)
     for loop in G.loops(s):
         c = s.pos[loop].mean(0)
-        if len(loop) > 40:
-            side = 'Left' if c[0] > 0 else 'Right'
+        side = 'Left' if c[0] > 0 else 'Right'
+        # O punho é a borda mais próxima da junta do pulso (as outras são as bases dos dedos).
+        if np.linalg.norm(c - A.h[f'{side}Hand']) < .03:
             a, f = A.h[f'{side}ForeArm'], A.h[f'{side}Hand']
             axis = (f - a) / np.linalg.norm(f - a)
             G.straighten(s, loop, c, axis, rings=1)
@@ -895,8 +896,359 @@ def gloves_fingerless(model, layout, item_id='gloves_fingerless'):
     return b.save({})
 
 
+# ------------------------------------------------------------------------ óculos de aviador
+
+def goggles_brass(model, layout, item_id='goggles_brass'):
+    """Óculos de aviador de latão empurrados para a testa, sobre tira de couro."""
+    from hair import tube_mesh
+    L = overlays.Landmarks(model)
+    ey = L.eye_y
+    b = ItemBuilder(model, item_id, 'headwear')
+    # Tira: alta na testa, desce atrás (passa sob o rabo de cavalo); folga para o volume do cabelo.
+    P, ang = head_ring(model, L, [ey + .066, ey + .062, ey + .05, ey + .03, ey + .018], n=96, clearance=.017)
+    pos, nrm, uv, tris = sweep(P, rounded_rect(.019, .0032, .0012, 4), [0, 1, 0], closed=True, caps=False)
+    strap = tex_free_leather(b, 'strap', '#5b3622')
+    b.bound('strap', pos, tris, uv * 20, strap, nrm=nrm, bone='Head')
+    brass = brass_material(b)
+    dark = b.glb.material('brass_dark', color=(*lin('#7a5420'), 1), metallic=.9, roughness=.45)
+    glass = b.glb.material('lens', color=(*lin('#ff9a2e'), 1), roughness=.04, metallic=0, emissive=(.35, .16, .02), clearcoat=(1, .03))
+    center_xz = L.center * [1, 0, 1]
+    cups, rims, lenses, bolts, inner = [], [], [], [], []
+    mids = []
+    for sg in (1, -1):
+        i = int(np.argmin(np.abs(ang - sg * np.radians(27))))
+        base = P[i]
+        radial = base - center_xz
+        radial[1] = 0
+        radial /= np.linalg.norm(radial)
+        axis = radial + np.array([0, .45, 0])
+        axis /= np.linalg.norm(axis)
+        c0 = base + radial * .001
+        mids.append((c0, axis))
+        # Copo cônico: largo na frente, encaixado na tira atrás.
+        ring = []
+        for t in np.linspace(0, 1, 6):
+            a = np.linspace(0, 2 * np.pi, 28, endpoint=False)
+            r = .019 + .006 * t
+            u_, v_ = _perp(axis)
+            ring.append(c0 + axis * (.017 * t) + r * (np.cos(a)[:, None] * u_ + np.sin(a)[:, None] * v_))
+        cp, cn, ct = _ring_grid(np.array(ring), c0)
+        cups.append((cp, cn, ct))
+        front = c0 + axis * .017
+        rims.append(torus(front, axis, .025, .0034, 32, 8))
+        rims.append(torus(c0 + axis * .004, axis, .0205, .0022, 28, 6))
+        lp, ln, lt = cylinder(front - axis * .0035, axis, .0215, .0045, 32)
+        lenses.append((lp, ln, lt))
+        u_, v_ = _perp(axis)
+        for k in range(8):
+            a = 2 * np.pi * k / 8 + .2
+            bolts.append(sphere_mesh(front + axis * .002 + .025 * (np.cos(a) * u_ + np.sin(a) * v_), .0022, 8, 5))
+        # Engrenagem de ajuste no lado de fora.
+        out_dir = np.array([sg, 0, 0.]) - axis * (axis[0] * sg)
+        out_dir /= np.linalg.norm(out_dir)
+        inner.append(gear_mesh(c0 + axis * .009 + out_dir * .025, out_dir, .0085, .0068, 9, .003, .0018))
+    # Ponte entre os copos.
+    (a0, ax0), (a1, ax1) = mids
+    t = np.linspace(0, 1, 12)[:, None]
+    bridge = (a0 + ax0 * .01) * (1 - t) + (a1 + ax1 * .01) * t + np.array([0, .006, 0]) * np.sin(t * np.pi) + (ax0 + ax1) / 2 * .006 * np.sin(t * np.pi)
+    bp, bn, _, bt, _ = tube_mesh([bridge], [np.full(12, .0035)], sides=8)
+    for name, parts, mat in (('cups', cups + [(bp, bn, bt)], brass), ('rims', rims + bolts, brass), ('gears', inner, dark), ('lenses', lenses, glass)):
+        pos, nrm, tris = merge(parts)
+        b.bound(name, pos, tris, np.zeros((len(pos), 2)), mat, nrm=nrm, bone='Head')
+    return b.save({})
+
+
+def _perp(axis):
+    ref = np.array([0, 1., 0]) if abs(axis[1]) < .9 else np.array([1., 0, 0])
+    u = np.cross(axis, ref)
+    u /= np.linalg.norm(u)
+    return u, np.cross(axis, u)
+
+
+def _ring_grid(R, center):
+    """Anéis (K, M, 3) -> malha tubular aberta com normais para fora do eixo."""
+    K, M = R.shape[:2]
+    pos = R.reshape(-1, 3)
+    tris = []
+    for k in range(K - 1):
+        for i in range(M):
+            j = (i + 1) % M
+            a, b_, c, d = k * M + i, k * M + j, (k + 1) * M + i, (k + 1) * M + j
+            tris += [(a, b_, c), (b_, d, c)]
+    tris = np.array(tris)
+    nrm = vertex_normals(pos, tris)
+    axis_pts = R.mean(1)
+    rel = pos - np.repeat(axis_pts, M, 0)
+    if (rel * nrm).sum() < 0:
+        tris = tris[:, ::-1]
+        nrm = -nrm
+    return pos, nrm, tris
+
+
+def tex_free_leather(b, name, hexstr, rough=.55):
+    """Couro liso (sem textura assada): cor, verniz leve."""
+    return b.glb.material(name, color=(*lin(hexstr), 1), roughness=rough, clearcoat=(.25, .45))
+
+
+# ------------------------------------------------------------------------ cinturão de ferramentas
+
+def belt_tool_harness(model, layout, item_id='belt_tool_harness'):
+    """Dois cintos de couro (um na cintura, outro caído no quadril) com bolsas, bússola e cristal."""
+    from collection_volt import basis, profile, ring_band
+    A = G.Anatomy(model)
+    s = cargo_surface(model, layout, A)
+    top = A.h['Hips'][1] + .05
+    b = ItemBuilder(model, item_id, 'belt')
+    leather = tex_free_leather(b, 'leather', BROWN)
+    leather_dark = tex_free_leather(b, 'leather_dark', DARK_BROWN, .6)
+    brass = brass_material(b)
+    belts = []
+    for k, (dy, tilt, width) in enumerate(((-.024, 0., .032), (-.085, .2, .026))):
+        center = np.array([0, top + dy, A.h['Hips'][2] - .004])
+        ax = np.array([np.sin(tilt), np.cos(tilt), 0.])
+        ax, u, v = ax, np.array([0, 0, 1.]), np.cross(ax, [0, 0, 1.])
+        rad = profile(s.pos, center, ax, u, v, 72, .016) + .006 + .004 * k
+        for _ in range(3):
+            rad = (np.roll(rad, 1) + 2 * rad + np.roll(rad, -1)) / 4
+        pos, nrm, tris = ring_band(center, ax, u, v, rad, width, .0045)
+        b.bound(f'belt{k}', pos, tris, np.zeros((len(pos), 2)), leather if k == 0 else leather_dark, nrm=nrm)
+        belts.append((center, ax, u, v, rad))
+
+    def at(k, deg, out=0.0, up=0.0):
+        center, ax, u, v, rad = belts[k]
+        j = int(round((np.radians(deg) + np.pi) / (2 * np.pi) * 72)) % 72
+        a = 2 * np.pi * j / 72 - np.pi
+        d = np.cos(a) * u + np.sin(a) * v
+        t = -np.sin(a) * u + np.cos(a) * v
+        return center + d * (rad[j] + .0045 + out) + ax * up, d, t, ax
+    # Fivelas.
+    parts = []
+    for k in (0, 1):
+        p, d, t, ax = at(k, 0 if k == 0 else -18, .002)
+        hw, hh = .021 - .003 * k, .022 - .004 * k
+        for off, sx, sy in ((t * hw, .0032, hh), (-t * hw, .0032, hh), (ax * hh, hw + .0032, .0032), (-ax * hh, hw + .0032, .0032)):
+            parts.append(_box(p + off, t, ax, d, sx, sy, .0028))
+        parts.append(_box(p, ax, t, d, .0015, hw * .9, .003))
+    # Bússola de latão (cinto de baixo, lado direito da frente) e rebites.
+    cp, cd, ct, cax = at(1, -48, .006)
+    parts.append(cylinder(cp - cd * .006, cd, .021, .011, 32))
+    parts.append(torus(cp + cd * .005, cd, .021, .0025, 32, 6))
+    parts.append(torus(cp + cd * .002 + cax * .024, ct, .005, .0018, 14, 6))
+    for deg in range(-170, 180, 30):
+        for k in (0, 1):
+            p, d, t, ax = at(k, deg, .0006)
+            parts.append(sphere_mesh(p, .0025, 8, 5))
+    pos, nrm, tris = merge(parts)
+    b.bound('brass', pos, tris, np.zeros((len(pos), 2)), brass, nrm=nrm, bone='Hips', rigid=True)
+    face = b.glb.material('compass_face', color=(*lin('#efe2c4'), 1), roughness=.4)
+    fp, fn, ft = cylinder(cp + cd * .0045, cd, .018, .0008, 32)
+    b.bound('compass_face', fp, ft, np.zeros((len(fp), 2)), face, nrm=fn, bone='Hips', rigid=True)
+    needle = b.glb.material('needle', color=(*lin('#c0392b'), 1), roughness=.4)
+    np_, nn_, nt_ = _box(cp + cd * .0058, cax, ct, cd, .014, .0018, .0007)
+    b.bound('needle', np_, nt_, np.zeros((len(np_), 2)), needle, nrm=nn_, bone='Hips', rigid=True)
+    glass = b.glb.material('glass', color=(.85, .92, 1, .25), roughness=.03, alpha=('BLEND', 0), clearcoat=(1, .02))
+    gp, gn, gt = cylinder(cp + cd * .0062, cd, .0185, .0012, 32)
+    b.bound('glass', gp, gt, np.zeros((len(gp), 2)), glass, nrm=gn, bone='Hips', rigid=True)
+    # Bolsas de couro com aba e botão.
+    pouches, flaps, snaps = [], [], []
+    for k, deg, w, h, dpt in ((0, 62, .05, .06, .022), (0, 112, .044, .052, .02), (1, -95, .055, .07, .026), (0, -128, .04, .05, .018)):
+        p, d, t, ax = at(k, deg, 0)
+        c = p + d * dpt - ax * (h * .45)
+        axes = np.array([t, ax, d])
+        pp, pn, pt, _ = superbox(c, axes, np.array([w / 2, h / 2, dpt]), 5.0, 20, 12)
+        pouches.append((pp, pn, pt))
+        fc = c + ax * (h * .3) + d * .003
+        fp_, fn_, ft_, _ = superbox(fc, axes, np.array([w / 2 + .003, h * .22, dpt + .002]), 6.0, 20, 10)
+        flaps.append((fp_, fn_, ft_))
+        snaps.append(cylinder(fc + d * (dpt + .001) - ax * h * .12, d, .0045, .003, 12))
+    for name, parts_, mat in (('pouches', pouches, leather), ('flaps', flaps, leather_dark), ('snaps', snaps, brass)):
+        pos, nrm, tris = merge(parts_)
+        b.bound(name, pos, tris, np.zeros((len(pos), 2)), mat, nrm=nrm, bone='Hips', rigid=True)
+    # Cristal azul pendurado por uma argola no cinto de baixo.
+    p, d, t, ax = at(1, 140, .004)
+    ring = torus(p - ax * .012, t, .007, .0016, 16, 6)
+    cc = p - ax * .045 + d * .006
+    crystal = []
+    tip_u, tip_d = cc + ax * .026, cc - ax * .03
+    k6 = [cc + .011 * (np.cos(a) * t + np.sin(a) * d) for a in np.linspace(0, 2 * np.pi, 6, endpoint=False)]
+    for i in range(6):
+        crystal += [(tip_u, k6[i], k6[(i + 1) % 6]), (tip_d, k6[(i + 1) % 6], k6[i])]
+    cpos = np.array([q for tri in crystal for q in tri])
+    ctris = np.arange(len(cpos)).reshape(-1, 3)
+    fnrm = np.cross(cpos[1::3] - cpos[0::3], cpos[2::3] - cpos[0::3])
+    fnrm /= np.linalg.norm(fnrm, axis=1, keepdims=True)
+    if (fnrm * (cpos[0::3] - cc)).sum() < 0:
+        ctris = ctris[:, ::-1]
+        fnrm = -fnrm
+    gem = b.glb.material('crystal', color=(*lin('#53d6ff'), .9), roughness=.08, emissive=(.1, .45, .7), clearcoat=(1, .02))
+    b.bound('crystal', cpos, ctris, np.zeros((len(cpos), 2)), gem, nrm=np.repeat(fnrm, 3, 0), bone='Hips', rigid=True)
+    cap = [ring, cylinder(tip_u - ax * .004, ax, .006, .006, 12)]
+    pos, nrm, tris = merge(cap)
+    b.bound('crystal_cap', pos, tris, np.zeros((len(pos), 2)), brass, nrm=nrm, bone='Hips', rigid=True)
+    return b.save({})
+
+
+def _box(center, ax, ay, az, sx, sy, sz):
+    from collection_volt import box
+    return box(center, ax, ay, az, sx, sy, sz)
+
+
+# ------------------------------------------------------------------------ lenço ao vento
+
+def neck_ring(model, y, n=72, clearance=.006, tilt=.0):
+    """Anel justo ao pescoço/base do pescoço na altura y (inclinado para a frente por `tilt`)."""
+    neck = model.heads['Neck']
+    center = np.array([0, y, neck[2]])
+    ang = np.linspace(-np.pi, np.pi, n, endpoint=False)
+    d = np.stack([np.sin(ang), np.zeros(n), np.cos(ang)], 1)
+    P = center + d * .14 + np.array([0, -tilt, 0]) * np.cos(ang)[:, None].clip(0)
+    sm = model.smoothed()
+    for _ in range(30):
+        ids, bary, off = model.bind(P, coords=sm)
+        nn = (model.normals[ids] * bary[..., None]).sum(1)
+        nn /= np.linalg.norm(nn, axis=1, keepdims=True)
+        dist = (off * nn).sum(1)
+        P = P - d * (dist - clearance)[:, None] * .7
+    for _ in range(4):
+        P = .5 * P + .25 * (np.roll(P, 1, 0) + np.roll(P, -1, 0))
+    return P, ang
+
+
+def scarf_wind(model, layout, item_id='scarf_wind'):
+    """Lenço enrolado no pescoço com nó lateral e duas pontas esvoaçando para trás."""
+    from collection_volt import grid_surface
+    b = ItemBuilder(model, item_id, 'back')
+    neck = model.heads['Neck']
+    y0 = neck[1] - .012
+    # Volta do lenço: dois rolos fofos sobrepostos.
+    rolls = []
+    for k, (dy, cl, h, th) in enumerate(((0.0, .01, .034, .016), (.026, .007, .03, .013))):
+        P, ang = neck_ring(model, y0 + dy, 72, cl, tilt=.018 - .006 * k)
+        twist = np.sin(ang * 3 + k) * .25
+        prof = np.array([(np.cos(a) * h / 2, np.sin(a) * th / 2 + th / 2) for a in np.linspace(0, 2 * np.pi, 14, endpoint=False)])
+        pos, nrm, uv, tris = sweep(P, prof, [0, 1, 0], closed=True, caps=False, twist=twist)
+        rolls.append((pos, nrm, uv, tris))
+    # Malha de tecido: textura neutra (recolorível) com trama e dobras.
+    size = 512
+    yy, xx = np.mgrid[0:size, 0:size] / size
+    pts = np.stack([xx.ravel() * 3, yy.ravel() * 3, np.zeros(size * size)], 1)
+    fold = fbm(pts, 2, 3, 4).reshape(size, size)
+    weave = (np.sin(xx * 2 * np.pi * 180) * np.sin(yy * 2 * np.pi * 180)) * .03
+    lum = np.clip(.86 + .16 * (fold - .5) + weave, 0, 1)
+    from PIL import Image
+    alb = Image.fromarray((np.repeat(lum[..., None], 3, 2) * 255).astype(np.uint8), 'RGB')
+    mat = b.glb.material('scarf', color=(*lin('#e8735a'), 1), base=b.glb.texture(alb, fmt='jpeg', quality=85), roughness=.82,
+                         sheen=((.9, .7, .6), .5), double=True, extras={'tint': 'main'})
+    for k, (pos, nrm, uv, tris) in enumerate(rolls):
+        b.bound(f'wrap{k}', pos, tris, uv * 8, mat, nrm=nrm)
+    # Nó no lado esquerdo da frente.
+    P0, ang0 = neck_ring(model, y0 + .012, 72, .022, tilt=.012)
+    j = int(np.argmin(np.abs(ang0 - np.radians(38))))
+    knot_c = P0[j]
+    out = knot_c - np.array([0, knot_c[1], neck[2]])
+    out[1] = 0
+    out /= np.linalg.norm(out)
+    kp, kn, kt, _ = superbox(knot_c + out * .006, np.array([np.cross([0, 1., 0], out), [0, 1., 0], out]), np.array([.022, .02, .014]), 2.6, 18, 12)
+    b.bound('knot', kp, kt, np.zeros((len(kp), 2)), mat, nrm=kn, bone='Neck', rigid=True)
+    # Pontas: fitas largas que passam pelo ombro e voam para trás e para o lado.
+    back = np.array([0, 0, -1.])
+    for k, (spread, length, width, phase) in enumerate(((.55, .36, .07, 0.0), (.9, .28, .06, 1.7))):
+        rows, cols = 26, 7
+        t = np.linspace(0, 1, rows)
+        start = knot_c + out * .01 + np.array([0, -.01, 0])
+        side = np.array([1., 0, 0])
+        path = (start
+                + np.outer(np.sin(t * np.pi / 2) * length * .95, back)
+                + np.outer(t * length * spread * .55, side)
+                + np.outer(.05 * np.sin(t * np.pi) + .03 * t, [0, 1., 0])
+                + np.outer(np.sin(t * 2 * np.pi * 1.3 + phase) * .02 * t, [0, 1., 0]))
+        # Afasta do tronco/ombro: o começo contorna o ombro por fora.
+        path[:, 0] += .05 * np.sin(np.clip(t * 3, 0, 1) * np.pi / 2)
+        path[:, 1] += .03 * np.sin(np.clip(t * 3, 0, 1) * np.pi / 2)
+        T = np.gradient(path, axis=0)
+        T /= np.linalg.norm(T, axis=1, keepdims=True)
+        wide = np.cross(T, [0, 0, 1.])
+        wide += np.array([0, 1., 0]) * .6
+        wide -= T * (wide * T).sum(1, keepdims=True)
+        wide /= np.linalg.norm(wide, axis=1, keepdims=True)
+        tw = np.sin(t * 2 * np.pi * 1.1 + phase) * .9 * t
+        nrm0 = np.cross(T, wide)
+        wide = wide * np.cos(tw)[:, None] + nrm0 * np.sin(tw)[:, None]
+        w = width * (1 - .55 * t ** 1.5) * (.6 + .4 * np.clip(t * 4, 0, 1))
+        cs = np.linspace(-1, 1, cols)
+        G3 = path[:, None, :] + wide[:, None, :] * (w[:, None, None] / 2 * cs[None, :, None])
+        # Ponta em V (corte enviesado).
+        G3[-1] = G3[-1] + T[-1] * (np.abs(cs)[:, None] - 1) * -.02
+        surf = grid_surface(G3)
+        nn = G.vertex_normals_canon(surf)
+        b.bound(f'tail{k}', surf.pos, surf.tris, surf.uv * np.array([1, 4]), mat, nrm=nn, bone='Spine2', rigid=True)
+    return b.save({})
+
+
+# ------------------------------------------------------------------------ chave inglesa
+
+IDLE_HAND = (np.array([-.303, .925, .082]), [0.265, -0.117, 0.295, 0.91])
+FIST = {'center': np.array([-.29, .835, .106]), 'idle': .65}
+
+
+def prop_wrench(model, layout, item_id='prop_wrench'):
+    """Chave inglesa grande: cabo no punho fechado, cabeça ajustável para baixo."""
+    from scipy.spatial.transform import Rotation as R
+    from collection_volt import extrude
+    b = ItemBuilder(model, item_id, 'prop')
+    hand_idle, quat = IDLE_HAND
+    q = R.from_quat(quat)
+    g = q.inv().apply(FIST['center'] - hand_idle) + model.heads['RightHand']
+    # Na pose parada a cabeça da chave aponta para baixo, para fora e um pouco à frente (longe da coxa).
+    up_idle = np.array([.3, 1, -.3])
+    u = q.inv().apply(up_idle / np.linalg.norm(up_idle)) * FIST['idle'] + np.array([0, 1, 0]) * (1 - FIST['idle'])
+    u /= np.linalg.norm(u)
+    # Plano da chave: largura voltada para a frente do corpo (perpendicular à palma).
+    e1 = np.cross(u, [1., 0, 0])
+    e1 /= np.linalg.norm(e1)
+    e2 = np.cross(u, e1)
+    steel = b.glb.material('steel', color=(*lin('#b9bec6'), 1), metallic=1, roughness=.28)
+    dark = b.glb.material('steel_dark', color=(*lin('#5d636c'), 1), metallic=1, roughness=.4)
+    grip = b.glb.material('grip', color=(*lin(CORAL), 1), roughness=.6, clearcoat=(.3, .4))
+    brass = brass_material(b)
+    th = .012
+    # Cabo achatado com cantos arredondados (passa pelo punho).
+    path = np.array([g + u * t for t in np.linspace(.07, -.165, 14)])
+    pos, nrm, uv, tris = sweep(path, rounded_rect(.02, th, .005, 4), e2, caps=True)
+    b.bound('handle', pos, tris, uv, steel, nrm=nrm, bone='RightHand', rigid=True)
+    # Empunhadura emborrachada coral com anéis.
+    path = np.array([g + u * t for t in np.linspace(.068, -.045, 10)])
+    pos, nrm, uv, tris = sweep(path, rounded_rect(.021, th + .005, .006, 4), e2, caps=True)
+    b.bound('grip', pos, tris, uv, grip, nrm=nrm, bone='RightHand', rigid=True)
+    # Cabeça: corpo, mandíbula fixa e móvel (perfil em C extrudado) e rosca sem-fim.
+    hc = g - u * .2
+    outline = []
+    for a in np.linspace(np.radians(40), np.radians(320), 26):
+        outline.append((np.cos(a) * .04, np.sin(a) * .04))
+    for a in np.linspace(np.radians(320), np.radians(40), 12):
+        outline.append((np.cos(a) * .016 + .016, np.sin(a) * .017))
+    outline = np.array(outline)
+    # x local ao longo de -u (a boca abre para baixo/fora), y ao longo de e1.
+    hp, hn, ht = extrude(outline[:, [0, 1]], hc - e2 * th / 2, -u, e1, e2, th)
+    b.bound('head', hp, ht, np.zeros((len(hp), 2)), steel, nrm=hn, bone='RightHand', rigid=True)
+    neck = _box(g - u * .163, e1, u, e2, .015, .016, th / 2 + .0005)
+    worm = cylinder(hc + u * .006 - e1 * .0, e1, .0055, .022, 16)
+    worm = (worm[0] - e1 * .011, worm[1], worm[2])
+    rings = merge([torus(hc + u * .006 + e1 * x, e1, .0057, .0011, 14, 5) for x in np.linspace(-.009, .009, 6)])
+    pos, nrm, tris = merge([neck, worm, rings])
+    b.bound('worm', pos, tris, np.zeros((len(pos), 2)), dark, nrm=nrm, bone='RightHand', rigid=True)
+    pos, nrm, tris = merge([torus(g + u * .074, u, .011, .0028, 20, 6), cylinder(g + u * .079, u, .009, .004, 16),
+                            cylinder(g - u * .06 - e2 * (th / 2 + .001), e2, .0035, th + .002, 10)])
+    b.bound('rivets', pos, tris, np.zeros((len(pos), 2)), brass, nrm=nrm, bone='RightHand', rigid=True)
+    return b.save({'grip': 'fist', 'hand': 'Right'})
+
+
 def register(item):
     item('top_aviator_jacket', 'top')(top_aviator_jacket)
     item('bottom_cargo_navy', 'bottom')(bottom_cargo_navy)
     item('shoes_lace_boots', 'shoes')(shoes_lace_boots)
     item('gloves_fingerless', 'hands')(gloves_fingerless)
+    item('goggles_brass', 'headwear')(goggles_brass)
+    item('belt_tool_harness', 'belt')(belt_tool_harness)
+    item('scarf_wind', 'back')(scarf_wind)
+    item('prop_wrench', 'prop')(prop_wrench)

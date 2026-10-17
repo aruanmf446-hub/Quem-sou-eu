@@ -798,6 +798,443 @@ def boot_cuffs(model, A, b, s, top_y):
         b.bound(f'cuff_gold_{side}', pos, tris, np.zeros((len(pos), 2)), gold, nrm=nrm, bone=f'{side}Leg')
 
 
+# ---------------------------------------------------------------- cabelo longo ondulado
+
+class _LongHairVolume:
+    """Cabeça e ombros (hair_styled.HeadVolume) + corpo com folga para a capa (o cabelo cai por cima dela)."""
+
+    def __init__(self, model):
+        import hair_styled as H
+        from scipy.spatial import cKDTree
+        self.v = H.HeadVolume(model)
+        self.center, self.radii, self.L = self.v.center, self.v.radii, self.v.L
+        self.neck_y = model.heads['Neck'][1]
+        torso = np.flatnonzero(model.coords[:13380, 1] < self.neck_y - .01)
+        sm = model.smoothed()
+        self.pts, self.nrm = sm[torso], model.normals[torso]
+        self.tree = cKDTree(self.pts)
+
+    def surface_dir(self, p):
+        return self.v.surface_dir(p)
+
+    def push_out(self, p, margin):
+        p = np.asarray(self.v.push_out(p, margin), float)
+        flat = p.reshape(-1, 3).copy()
+        low = flat[:, 1] < self.neck_y - .02
+        if low.any():
+            q = flat[low]
+            # Folga da capa curta (mais larga nos ombros) + margem do cabelo.
+            clear = .06 + .045 * smoothstep(.11, .24, np.abs(q[:, 0])) + margin
+            for _ in range(3):
+                _, i = self.tree.query(q, k=4)
+                n = self.nrm[i].mean(1)
+                n /= np.linalg.norm(n, axis=1, keepdims=True)
+                d = ((q - self.pts[i[:, 0]]) * n).sum(1)
+                q = q + n * np.clip(clear - d, 0, None)[:, None]
+            flat[low] = q
+        return flat.reshape(p.shape)
+
+
+def _fall_paths(vol, starts, dirs, lengths, waves, k=24, gravity=1.5, margin=.012):
+    """Mechas que caem juntas e escorregam sobre cabeça, ombros e costas (a direção segue o deslocamento real)."""
+    P = np.asarray(starts, float)
+    D = np.asarray(dirs, float)
+    D /= np.linalg.norm(D, axis=1, keepdims=True)
+    step = np.asarray(lengths, float)[:, None] / (k - 1)
+    out = [P.copy()]
+    for i in range(1, k):
+        t = i / (k - 1)
+        D = D * .9 + np.array([0, -1., 0]) * gravity * .25 * (.3 + t)
+        D /= np.linalg.norm(D, axis=1, keepdims=True)
+        Q = vol.push_out(P + D * step, margin)
+        mv = Q - P
+        nm = np.linalg.norm(mv, axis=1, keepdims=True)
+        D = D * .4 + mv / np.maximum(nm, 1e-9) * .6
+        D /= np.linalg.norm(D, axis=1, keepdims=True)
+        P = Q
+        out.append(P.copy())
+    paths = np.stack(out, 1)
+    res = []
+    tt = np.linspace(0, 1, k)
+    for pts, (amp, freq, phase) in zip(paths, waves):
+        T = np.gradient(pts, axis=0)
+        T /= np.maximum(np.linalg.norm(T, axis=1, keepdims=True), 1e-9)
+        o = pts - vol.center * np.array([1, 0, 1])
+        o[:, 1] = 0
+        side = np.cross(T, o)
+        side /= np.maximum(np.linalg.norm(side, axis=1, keepdims=True), 1e-9)
+        pts = pts + side * (np.sin(tt * freq * 2 * np.pi + phase) * amp * np.clip(tt * 2.5, 0, 1))[:, None]
+        res.append(vol.push_out(pts, margin * .7))
+    return res
+
+
+def _emit_long(b, model, name, mat, paths, widths, vol, tip_scale=1.0, flat=.42):
+    """Mechas longas: a raiz segue a cabeça e o comprimento passa para a coluna (não atravessa as costas ao virar)."""
+    import hair_styled as H
+    pos, nrm, uv, tris, along = H.clump_mesh(paths, widths, vol, flat=flat)
+    m = model
+    ids, bary, _ = m.bind(pos)
+    morphs = {k: v for k, v in m.bound_morphs(ids, bary).items() if not k.startswith('expr_') and np.abs(v).max() > 5e-4}
+    neck_y = m.heads['Neck'][1]
+    w = smoothstep(neck_y + .01, neck_y - .12, pos[:, 1])
+    W = np.zeros((len(pos), len(m.bone_names)), np.float32)
+    W[:, m.bone_index('Head')] = 1 - w
+    W[:, m.bone_index('Neck')] += w * .35
+    W[:, m.bone_index('Spine2')] += w * .65
+    tip = (np.clip(along, 0, 1) ** 1.4 * tip_scale).astype(np.float32)
+    b._emit(name, pos, nrm, uv, tris, mat, W, morphs, {'_TIP': tip})
+
+
+def hair_wavy_long(model, layout, item_id='hair_wavy_long'):
+    """Cabelo longo em ondas largas até o meio das costas, risca lateral e mechas que emolduram o rosto."""
+    import hair
+    import hair_styled as H
+    from hair_styles import emit, scalp_base, styled_material
+    rng = np.random.default_rng(31)
+    vol = _LongHairVolume(model)
+    L = vol.L
+    b = scalp_base(model, layout, item_id)
+    mat = styled_material(b, 'hair', .45, tips=True)
+    c, r = vol.center, vol.radii
+    part_x = r[0] * .3  # risca do lado esquerdo do personagem
+    P, N, az = H.roots(model, .012, lambda P, N, aaz: P[:, 1] > hair.scalp_line(L, aaz) + .004)
+    cap_paths, cap_w, long_paths, long_w, fall = [], [], [], [], []
+    for p, a in zip(P, az):
+        # Destino na calota: penteado para o lado oposto da risca e para trás, terminando na altura das orelhas.
+        side = 1 if p[0] > part_x else -1
+        ang = np.radians(a)
+        back = abs(a) > 100
+        tgt_az = ang + side * (.25 if not back else .05)
+        tgt_y = c[1] - r[1] * (.15 if not back else .45)
+        tgt = np.array([c[0] + np.sin(tgt_az) * r[0] * 1.05, tgt_y, c[2] + np.cos(tgt_az) * r[2] * 1.05 - .01])
+        if abs(a) < 35:
+            # Frente: varre para o lado e para trás da orelha.
+            tgt = np.array([side * r[0] * 1.02, c[1] - r[1] * .05, c[2] - r[2] * .15])
+        path = H.cap_path(vol, p, tgt, 14, lift=(.004, .014 + rng.uniform(0, .006)))
+        cap_paths.append(path)
+        cap_w.append(H.taper(14, rng.uniform(.018, .026), .7, .5))
+        # Continuação: cai em ondas largas a partir do fim da calota.
+        if rng.uniform() < .8:
+            d = path[-1] - path[-3]
+            # Tudo cai por trás dos ombros; só as mechas soltas abaixo ficam na frente.
+            back_dir = np.array([np.sign(path[-1][0]) * .25, -1.2, -1.1]) if abs(a) < 120 else np.array([path[-1][0] * 2, -1.2, -.4])
+            fall.append((path[-2], path[-1], d / np.linalg.norm(d) * .3 + back_dir,
+                         rng.uniform(.52, .64) if abs(a) > 60 else rng.uniform(.42, .52),
+                         (rng.uniform(.016, .024), rng.uniform(2.0, 2.6), rng.uniform(0, 6)), rng.uniform(.036, .05)))
+    fps = _fall_paths(vol, [f[1] for f in fall], [f[2] for f in fall], [f[3] for f in fall], [f[4] for f in fall], 24)
+    for f, fp in zip(fall, fps):
+        long_paths.append(np.vstack([f[0][None], fp]))
+        long_w.append(H.taper(25, f[5], .25))
+    emit(b, 'cap', mat, cap_paths, cap_w, vol.v, tip_scale=.2)
+    _emit_long(b, model, 'waves', mat, long_paths, long_w, vol, tip_scale=1)
+    # Franja lateral longa e mechas que caem à frente dos ombros.
+    paths, widths = [], []
+    for i in range(6):
+        sx = part_x - .01 - i * .012
+        root = c + np.array([sx, r[1] * .72, r[2] * .55])
+        root = vol.push_out(root[None], .006)[0]
+        d = np.array([-.75, -.3, .55])
+        paths.append(H.free_path(vol, root, d, rng.uniform(.13, .17), 18, gravity=1.1, stiff=.45,
+                                 wave=(.006, 1.1, rng.uniform(0, 6)), margin=.01, seed=200 + i))
+        widths.append(H.taper(18, rng.uniform(.03, .038), .2))
+    locks = []
+    for sd in (1, -1):
+        for i in range(2):
+            root = c + np.array([sd * r[0] * .9, r[1] * .05 - i * .01, r[2] * (.35 - i * .14)])
+            locks.append((vol.push_out(root[None], .006)[0], np.array([sd * .35, -1, .3]), rng.uniform(.36, .42),
+                          (.016, 2.4, rng.uniform(0, 6))))
+    for fp in _fall_paths(vol, [l[0] for l in locks], [l[1] for l in locks], [l[2] for l in locks], [l[3] for l in locks], 22, 1.4):
+        paths.append(fp)
+        widths.append(H.taper(22, rng.uniform(.026, .034), .2))
+    _emit_long(b, model, 'front', mat, paths, widths, vol, tip_scale=.9)
+    return b.save({'tips': True})
+
+
+# ---------------------------------------------------------------- tiara de engrenagem
+
+def circlet_gear(model, layout, item_id='circlet_gear'):
+    """Tiara dourada fina sobre o cabelo com engrenagens e gema azul acima da têmpora."""
+    import overlays
+    from accessories import head_ring
+    from hair import tube_mesh
+    L = overlays.Landmarks(model)
+    ey = L.eye_y
+    b = ItemBuilder(model, item_id, 'headwear')
+    gold = gold_material(b, roughness=.28)
+    P, ang = head_ring(model, L, [ey + .085, ey + .08, ey + .07, ey + .06, ey + .05], n=96, clearance=.018)
+    loop = np.vstack([P, P[:1]])
+    tp, tn, _, tt, _ = tube_mesh([loop], [np.full(len(loop), .0028)], sides=8)
+    parts = [(tp, tn, tt)]
+    # Pingente central na testa (estrela pequena).
+    i0 = int(np.argmin(np.abs(ang)))
+    out = P[i0] - L.center
+    out[1] = 0
+    out /= np.linalg.norm(out)
+    up = np.array([0, 1., 0])
+    parts.append(extrude_polygon(star_polygon(.009), P[i0] + out * .002 - up * .006, np.cross(up, out), up, out, .003))
+    # Engrenagens sobre a têmpora esquerda (do personagem).
+    i1 = int(np.argmin(np.abs(ang - np.radians(62))))
+    o1 = P[i1] - L.center
+    o1[1] = 0
+    o1 /= np.linalg.norm(o1)
+    n1 = o1 + np.array([0, .25, .15])
+    n1 /= np.linalg.norm(n1)
+    g1 = P[i1] + o1 * .006 + up * .012
+    parts.append(gear_mesh(g1, n1, .024, .0045, 12, .45, 5))
+    _, e1, e2 = frame(n1)
+    g2 = g1 + e1 * .026 + e2 * .012 - n1 * .002
+    parts.append(gear_mesh(g2, n1, .014, .004, 9, .5, 4))
+    g3 = g1 - e1 * .02 + e2 * .018 - n1 * .003
+    parts.append(gear_mesh(g3, n1, .011, .0035, 8, .5, 3))
+    pos, nrm, tris = merge(parts)
+    b.bound('gold', pos, tris, np.zeros((len(pos), 2)), gold, nrm=nrm, bone='Head')
+    gem = b.glb.material('gem', color=(*lin('#3f7bff'), 1), roughness=.06, emissive=(.05, .14, .45), clearcoat=(1, .03))
+    gp, gn, gt = sphere_mesh(g1 + n1 * .004, .0075, 16, 10)
+    b.bound('gem', gp, gt, np.zeros((len(gp), 2)), gem, nrm=gn, bone='Head')
+    return b.save({})
+
+
+# ---------------------------------------------------------------- capa curta com capuz
+
+def _neck_ring(model, y, n, clearance):
+    neck = model.heads['Neck']
+    center = np.array([0, y, neck[2]])
+    ang = np.linspace(-np.pi, np.pi, n, endpoint=False)
+    d = np.stack([np.sin(ang), np.zeros(n), np.cos(ang)], 1)
+    P = center + d * .14
+    sm = model.smoothed()
+    for _ in range(30):
+        ids, bary, off = model.bind(P, coords=sm)
+        nn = (model.normals[ids] * bary[..., None]).sum(1)
+        nn /= np.linalg.norm(nn, axis=1, keepdims=True)
+        P = P - d * ((off * nn).sum(1) - clearance)[:, None] * .7
+    for _ in range(4):
+        P = .5 * P + .25 * (np.roll(P, 1, 0) + np.roll(P, -1, 0))
+    return P, ang
+
+
+def _push_from_body(model, P, clearance, iters=12):
+    """Afasta pontos da pele (corpo alisado) até `clearance`, pela normal da superfície mais próxima."""
+    sm = model.smoothed()
+    nrm = model.normals
+    for _ in range(iters):
+        ids, bary, off = model.bind(P, coords=sm)
+        n = (nrm[ids] * bary[..., None]).sum(1)
+        n /= np.linalg.norm(n, axis=1, keepdims=True)
+        d = (off * n).sum(1)
+        cl = clearance(P) if callable(clearance) else clearance
+        bad = d < cl
+        if not bad.any():
+            break
+        P = P + n * np.where(bad, cl - d, 0)[:, None]
+    return P
+
+
+def back_star_capelet(model, layout, item_id='back_star_capelet'):
+    """Capa curta azul-noite sobre os ombros, estrelas douradas, barra bordada, capuz caído e broche."""
+    from collection_volt import emit_custom, grid_surface
+    b = ItemBuilder(model, item_id, 'back')
+    neck = model.heads['Neck']
+    y_neck = neck[1] - .03
+    gap = np.radians(14)
+    cols, rows = 97, 22
+    theta = np.linspace(-np.pi + gap, np.pi - gap, cols) + np.pi  # 0 = costas... ajustado abaixo
+    theta = (theta + np.pi) % (2 * np.pi) - np.pi  # ângulo a partir da frente (+z), abertura na frente
+    ring, ang = _neck_ring(model, y_neck, 180, .02)
+    neck_pts = np.array([ring[int(np.argmin(np.abs(((ang - t) + np.pi) % (2 * np.pi) - np.pi)))] for t in theta])
+    shoulder_y = model.heads['LeftArm'][1]
+    sc = np.array([0, shoulder_y, .01])
+    G3 = np.zeros((rows, cols, 3))
+    for j, t in enumerate(theta):
+        d = np.array([np.sin(t), 0, np.cos(t)])
+        # Barra: elipse larga (cobre o ombro até o meio do braço), mais curta na frente.
+        front = max(np.cos(t), 0)
+        hem_r = np.array([.34, 0, .15])
+        hem = sc + d * hem_r + np.array([0, -.13 - .06 * (1 - front) + .04 * front, 0])
+        for i, s in enumerate(np.linspace(0, 1, rows)):
+            q = neck_pts[j] * (1 - s) + hem * s
+            q = q + np.array([0, .045, 0]) * np.sin(s * np.pi) ** 1.3 + d * .02 * np.sin(s * np.pi)
+            G3[i, j] = q
+    def clear(P):
+        # Folga maior sobre os ombros e braços: cobre as mangas bufantes da túnica.
+        return .03 + .045 * smoothstep(.11, .24, np.abs(P[:, 0]))
+    flat = _push_from_body(model, G3.reshape(-1, 3), clear)
+    G3 = flat.reshape(rows, cols, 3)
+    # Suaviza a grade (dobra macia) mantendo a gola.
+    for _ in range(4):
+        G3[1:-1] = .5 * G3[1:-1] + .25 * (G3[:-2] + G3[2:])
+        G3[:, 1:-1] = .5 * G3[:, 1:-1] + .25 * (G3[:, :-2] + G3[:, 2:])
+    # Pregas: ondulação que cresce para a barra.
+    sgrid = np.linspace(0, 1, rows)[:, None]
+    wave = np.sin(theta[None, :] * 14) * .006 * sgrid ** 1.5
+    radial = G3 - np.array([0, 0, neck[2]])
+    radial[..., 1] = 0
+    radial /= np.maximum(np.linalg.norm(radial, axis=-1, keepdims=True), 1e-9)
+    G3 = G3 + radial * wave[..., None]
+    G3 = _push_from_body(model, G3.reshape(-1, 3), lambda P: clear(P) - .004, 6).reshape(rows, cols, 3)
+    s = grid_surface(G3)
+    s.uv = np.stack([theta[None, :].repeat(rows, 0).ravel() * .24, -np.cumsum(np.vstack([np.zeros((1, cols)), np.linalg.norm(np.diff(G3, axis=0), axis=-1)]), 0).ravel()], 1)
+    uv_lo, uv_hi = s.uv.min(0), s.uv.max(0)
+    s.uv = (s.uv - uv_lo) / (uv_hi - uv_lo) * .98 + .01
+    G.solidify(s, .003)
+    ids, bary, _ = model.bind(s.pos)
+    W = model.bound_weights(ids, bary).astype(np.float32)
+    keep = np.isin(model.bone_names, ('Spine1', 'Spine2', 'Neck', 'LeftShoulder', 'RightShoulder', 'LeftArm', 'RightArm'))
+    W[:, ~keep] = 0
+    W[:, model.bone_index('Spine2')] += .15
+    W /= W.sum(1, keepdims=True)
+    # Textura: azul-noite, estrelas douradas, barra com fio duplo dourado.
+    bake = cloth.bake_surface(s, 2048)
+    p = bake.pos[bake.mask].astype(np.float64)
+    n = bake.nrm[bake.mask]
+    part = bake.at('part')[:, 0]
+    hh, ww = bake.mask.shape
+    vv, uu = np.mgrid[0:hh, 0:ww]
+    U = ((uu[bake.mask] + .5) / ww - .01) / .98
+    V = ((vv[bake.mask] + .5) / hh - .01) / .98
+    X = uv_lo[0] + U * (uv_hi[0] - uv_lo[0])
+    Y = uv_lo[1] + V * (uv_hi[1] - uv_lo[1])
+    v_min = uv_lo[1]
+    stars, _ = star_field(X, Y, .045, (.007, .012), .75, seed=21)
+    hem_d = Y - v_min
+    trim = smoothstep(.003, .0015, np.abs(hem_d - .012)) + smoothstep(.002, .001, np.abs(hem_d - .022))
+    stars = stars * (hem_d > .035)
+    navy, deep, gold = cloth.srgb(NAVY), cloth.srgb(NAVY_DEEP), cloth.srgb(GOLD)
+    alb = navy * (1 + .08 * (fbm(p, 16, 3, 7) - .5))[:, None]
+    alb = cloth.lin_mix(alb, deep, smoothstep(.04, 0, hem_d) * .6)
+    gm = np.clip(stars + trim, 0, 1)
+    alb = cloth.lin_mix(alb, gold, gm)
+    alb = np.where((part > 1.5)[:, None], deep * .8, alb)
+    hfn = fabric_height(n, 'satin', .002, lambda q: gm * .0003)
+    a, nm, orm = cloth.finish(bake, np.clip(alb, 0, 1), .6 * (1 - gm) + .32 * gm, hfn, metal=gm * .85)
+    mat = tex_material(b, 'capelet', a, nm, orm, sheen=((.3, .34, .55), .5), double=True)
+    emit_custom(b, 'capelet', s, mat, W, model)
+    # Capuz caído atrás do pescoço: rolo grosso em meia-lua com forro claro.
+    back = [k for k in range(len(theta)) if abs(theta[k]) > np.radians(70)]
+    path = np.array([G3[1, k] for k in back])
+    path = path + np.array([0, .012, -.02])
+    hood = []
+    for k, q in enumerate(path):
+        t = k / (len(path) - 1)
+        fat = .032 * np.sin(t * np.pi) ** .6 + .006
+        hood.append((q, fat))
+    from hair import tube_mesh
+    hp, hn, huv, ht, _ = tube_mesh([path], [np.array([f for _, f in hood])], sides=14)
+    hp = _push_from_body(model, hp, .02, 6)
+    hood_mat = flat_material(b, 'hood', NAVY_DEEP, roughness=.6)
+    b.bound('hood', hp, ht, huv, hood_mat, nrm=hn, bone='Spine2')
+    # Broche: sol dourado com gema, fechando a capa na frente do pescoço.
+    gold_m = gold_material(b, 'clasp', .3)
+    fr = ring[int(np.argmin(np.abs(ang)))] + np.array([0, -.012, .012])
+    parts = [gear_mesh(fr, np.array([0, .2, 1.]), .018, .004, 12, .5, 6)]
+    for sgn in (1, -1):
+        parts.append(cylinder(fr + np.array([sgn * .03, -.004, -.004]), np.array([0, .2, 1.]), .008, .005, 16))
+    pos, nrm, tris = merge(parts)
+    b.bound('clasp', pos, tris, np.zeros((len(pos), 2)), gold_m, nrm=nrm, bone='Spine2', rigid=True)
+    gem = b.glb.material('gem', color=(*lin('#3f7bff'), 1), roughness=.06, emissive=(.05, .14, .45), clearcoat=(1, .03))
+    gp, gn, gt = sphere_mesh(fr + np.array([0, .001, .006]), .007, 14, 8)
+    b.bound('gem', gp, gt, np.zeros((len(gp), 2)), gem, nrm=gn, bone='Spine2', rigid=True)
+    return b.save({})
+
+
+# ---------------------------------------------------------------- cinto da bússola
+
+def belt_compass(model, layout, item_id='belt_compass'):
+    """Cinto de couro largo com fivela-bússola dourada e passadores."""
+    from collection_volt import box, profile, ring_band
+    A = G.Anatomy(model)
+    G.reset_strips()
+    s, top = star_pants_surface(model, layout, A)
+    b = ItemBuilder(model, item_id, 'belt')
+    center = np.array([0, top - .03, A.h['Hips'][2]])
+    ax, u, v = np.array([0, 1., 0]), np.array([0, 0, 1.]), np.array([1., 0, 0])
+    rad = profile(s.pos, center, ax, u, v, 72, .02) + .009
+    for _ in range(3):
+        rad = (np.roll(rad, 1) + 2 * rad + np.roll(rad, -1)) / 4
+    leather = flat_material(b, 'belt', LEATHER, roughness=.55, clearcoat=(.25, .4))
+    pos, nrm, tris = ring_band(center, ax, u, v, rad, .04, .0045)
+    b.bound('belt', pos, tris, np.zeros((len(pos), 2)), leather, nrm=nrm)
+    gold = gold_material(b, roughness=.3)
+    front = center + u * (rad[36] + .006)
+    parts = [cylinder(front, u, .03, .008, 40), torus(front + u * .008, u, .03, .003, 40, 8),
+             torus(front + u * .008, u, .021, .0016, 32, 6)]
+    # Rosa dos ventos em relevo.
+    for k in range(8):
+        a = k * np.pi / 4
+        L_ = .019 if k % 2 == 0 else .012
+        d = np.cos(a) * v + np.sin(a) * ax
+        o = np.cross(u, d)
+        tri = np.array([front + u * .009 + d * L_, front + u * .009 + o * .0035, front + u * .009 - o * .0035, front + u * .0125])
+        tris_ = np.array([[0, 1, 3], [0, 3, 2]])
+        nn = np.cross(tri[1] - tri[0], tri[3] - tri[0])
+        nn = nn / np.linalg.norm(nn)
+        parts.append((tri, np.tile(u, (4, 1)), tris_ if nn @ u > 0 else tris_[:, ::-1]))
+    for sgn in (1, -1):
+        parts.append(box(center + (np.cos(np.radians(sgn * 40) - 0) * u + np.sin(np.radians(sgn * 40)) * v) * (rad[36 + sgn * 8] + .005), v, ax, u, .006, .024, .0025))
+    pos, nrm, tris = merge(parts)
+    b.bound('compass', pos, tris, np.zeros((len(pos), 2)), gold, nrm=nrm, bone='Hips', rigid=True)
+    face = b.glb.material('face', color=(*lin(NAVY), 1), roughness=.3, clearcoat=(1, .05))
+    fp, fn, ft = cylinder(front + u * .0082, u, .02, .0006, 32)
+    b.bound('face', fp, ft, np.zeros((len(fp), 2)), face, nrm=fn, bone='Hips', rigid=True)
+    return b.save({})
+
+
+# ---------------------------------------------------------------- braçadeiras de couro
+
+def bracers_leather(model, layout, item_id='bracers_leather'):
+    """Braçadeiras de couro no antebraço com cordões cruzados e bordas douradas."""
+    A = G.Anatomy(model)
+    G.reset_strips()
+
+    def ok(v):
+        b_ = A.bone[v]
+        return (np.isin(b_, ('LeftForeArm', 'RightForeArm')) & (A.t[v] > .42) & (A.t[v] < .9)).all()
+    s = G.surface(model, G.select(layout, ok))
+    G.offset(model, s, .0045)
+    G.smooth(s, 3, keep_boundary=True)
+    for loop in G.loops(s):
+        c = s.pos[loop].mean(0)
+        side = 'Left' if c[0] > 0 else 'Right'
+        a, f = A.h[f'{side}ForeArm'], A.h[f'{side}Hand']
+        axis = (f - a) / np.linalg.norm(f - a)
+        G.straighten(s, loop, c, axis, rings=2)
+        sgn = 1 if (c - (a + f) / 2) @ axis > 0 else -1
+        G.band(s, loop, lambda P, d=axis * sgn: np.broadcast_to(d, P.shape).copy(), .006, rows=2, part=1, flare=.002)
+    G.push_out(model, s, .004, smooth_body=False)
+    G.solidify(s, .0022)
+    b = ItemBuilder(model, item_id, 'wrist')
+    bake = cloth.bake_surface(s, 1024)
+    p = bake.pos[bake.mask].astype(np.float64)
+    n = bake.nrm[bake.mask]
+    part = bake.at('part')[:, 0]
+    alb = cloth.srgb(LEATHER) * (1 + .16 * (fbm(p, 25, 3, 5) - .5))[:, None]
+    lace = np.zeros(len(p))
+    for side, sg in (('Left', 1), ('Right', -1)):
+        a, f = A.h[f'{side}ForeArm'], A.h[f'{side}Hand']
+        axis = (f - a) / np.linalg.norm(f - a)
+        rel = p - a
+        along = rel @ axis
+        # Lado de dentro do antebraço (voltado para o corpo na pose A) recebe o cordão cruzado.
+        inner = np.array([-sg, 0, 0.]) - axis * (-sg * axis[0])
+        inner /= np.linalg.norm(inner)
+        side_ax = np.cross(axis, inner)
+        lat = rel @ side_ax
+        m = (np.sign(p[:, 0]) == sg) & ((rel @ inner) > 0)
+        zig = np.abs(((along * 70) % 2) - 1) * 2 - 1
+        lace = np.maximum(lace, m * smoothstep(.0022, .001, np.abs(np.abs(lat) - np.abs(zig) * .012)) * (np.abs(lat) < .014))
+        lace = np.maximum(lace, m * smoothstep(.0028, .0014, np.abs(np.abs(lat) - .014)))
+    edge = (part > .5) & (part < 1.5)
+    alb = cloth.lin_mix(alb, cloth.srgb(CREAM), lace * .9)
+    alb = np.where(edge[:, None], cloth.srgb(GOLD), alb)
+    alb = np.where((part > 1.5)[:, None], cloth.srgb(LEATHER_DARK), alb)
+    metal = edge * .85
+    rough = np.where(edge, .32, .55)
+    a_, nm, orm = finish_flat(bake, np.clip(alb, 0, 1), rough, (fbm(p, 60, 2, 3) - .5) * .0005 + lace * .0004, metal=metal)
+    mat = tex_material(b, 'bracer', a_, nm, orm, clearcoat=(.3, .35))
+    b.derived('bracer', s, mat, weight_smooth=1)
+    return b.save({})
+
+
 # ---------------------------------------------------------------- registro
 
 def register(item):
@@ -805,3 +1242,8 @@ def register(item):
     item('top_star_tunic', 'top')(star_tunic)
     item('bottom_star_pants', 'bottom')(star_pants)
     item('shoes_gold_boots', 'shoes')(gold_boots)
+    item('hair_wavy_long', 'hair')(hair_wavy_long)
+    item('circlet_gear', 'headwear')(circlet_gear)
+    item('back_star_capelet', 'back')(back_star_capelet)
+    item('belt_compass', 'belt')(belt_compass)
+    item('bracers_leather', 'wrist')(bracers_leather)
