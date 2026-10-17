@@ -145,14 +145,14 @@ def cap(model, layout, item_id='cap_snapback', color='#1d2433'):
     # Aba reta à frente, a partir da borda inferior frontal.
     P = s.pos[loop]
     aaz = azimuth(L, P)
-    front = aaz < 75
+    front = aaz < 58
     idx = np.flatnonzero(front)
     ang = np.degrees(np.arctan2(P[idx, 0] - L.center[0], P[idx, 2] - L.center[2]))
     order = idx[np.argsort(ang)]
     edge = P[order]
     k = len(edge)
     ts = np.linspace(-1, 1, k)
-    depth = .078 * np.sqrt(np.clip(1 - ts ** 2, 0, 1))
+    depth = .075 * np.clip(1 - ts ** 2, 0, 1) ** .6
     rad = edge[:, [0, 2]] - L.center[[0, 2]]
     rad /= np.linalg.norm(rad, axis=1, keepdims=True)
     rows = 6
@@ -196,45 +196,88 @@ def cap(model, layout, item_id='cap_snapback', color='#1d2433'):
     return b.save({})
 
 
+def head_ring(model, L, heights, n=96, clearance=.004):
+    """Anel ajustado à cabeça: para cada ângulo, encontra a superfície (corpo alisado) e afasta."""
+    ang = np.linspace(-np.pi, np.pi, n, endpoint=False)
+    pts = []
+    for a in ang:
+        aaz = abs(np.degrees(a))
+        y = np.interp(aaz, [0, 60, 95, 130, 180], heights)
+        d = np.array([np.sin(a), 0, np.cos(a)])
+        pts.append(L.center * [1, 0, 1] + np.array([0, y, 0]) + d * .2)
+    P = np.array(pts)
+    center = L.center * [1, 0, 1]
+    for _ in range(25):
+        ids, bary, off = model.bind(P, coords=model.smoothed())
+        nn = (model.normals[ids] * bary[..., None]).sum(1)
+        nn /= np.linalg.norm(nn, axis=1, keepdims=True)
+        dist = (off * nn).sum(1)
+        radial = P - np.stack([center[0] + 0 * P[:, 0], P[:, 1], center[2] + 0 * P[:, 0]], 1)
+        radial[:, 1] = 0
+        radial /= np.linalg.norm(radial, axis=1, keepdims=True)
+        P = P - radial * (dist - clearance)[:, None] * .8
+    # Suaviza o anel.
+    for _ in range(6):
+        P = .5 * P + .25 * (np.roll(P, 1, 0) + np.roll(P, -1, 0))
+    return P, ang
+
+
 def headband(model, layout, item_id='headband', color='#f2f2ee'):
     L = overlays.Landmarks(model)
     G.reset_strips()
     ey = L.eye_y
-    c = model.coords
-
-    def line(P):
-        aaz = azimuth(L, P)
-        return np.interp(aaz, [0, 60, 95, 130, 180], [ey + .056, ey + .05, ey + .045, ey + .04, ey + .03])
-
-    def ok(v):
-        P = c[v]
-        d = P[:, 1] - line(P)
-        ear = (azimuth(L, P) > 75) & (azimuth(L, P) < 115) & (P[:, 1] < ey + .035)
-        return ((d > -.024) & (d < .004) & ~ear).all()
-    s = head_surface(model, layout, ok)
-    G.offset(model, s, .007)
-    G.smooth(s, 6, keep_boundary=True)
-    G.push_out(model, s, .006)
-    for loop in G.loops(s):
-        P = s.pos[loop]
-        pc, pn = plane_fit(P)
-        G.straighten(s, loop, pc, pn, rings=2)
-    G.smooth(s, 2, keep_boundary=True)
-    G.push_out(model, s, .005)
-    G.solidify(s, .004)
+    width = .026
+    rows = 5
+    rings = []
+    for k in range(rows):
+        f = k / (rows - 1)
+        hs = [ey + .045 + width * f, ey + .04 + width * f, ey + .032 + width * f, ey + .028 + width * f, ey + .02 + width * f]
+        P, ang = head_ring(model, L, hs, clearance=.0035 + .0015 * np.sin(f * np.pi))
+        rings.append(P)
+    n = len(rings[0])
+    outer = np.vstack(rings)
+    radial = outer - L.center * [1, 0, 1]
+    radial[:, 1] = 0
+    radial /= np.linalg.norm(radial, axis=1, keepdims=True)
+    inner = outer - radial * .003
+    tris = []
+    for k in range(rows - 1):
+        for i in range(n):
+            a, b_ = k * n + i, k * n + (i + 1) % n
+            tris += [(a, b_, a + n), (b_, b_ + n, a + n)]
+    tris = np.array(tris)
+    N = len(outer)
+    edges = []
+    for k, flip in ((0, False), (rows - 1, True)):
+        for i in range(n):
+            a, b_ = k * n + i, k * n + (i + 1) % n
+            t = [(a, a + N, b_), (b_, a + N, b_ + N)]
+            edges += [x[::-1] for x in t] if flip else t
+    pos = np.vstack([outer, inner])
+    all_t = np.vstack([tris, tris[:, ::-1] + N, np.array(edges)])
+    nn = vertex_normals(pos, all_t)
+    if (nn[:N] * radial).sum() < 0:
+        all_t = all_t[:, ::-1]
+    uv = np.zeros((len(pos), 2))
+    u = np.tile(np.arange(n) / n, rows)
+    v = np.repeat(np.arange(rows) / (rows - 1), n)
+    uv[:N] = np.stack([u * 8, v], 1)
+    uv[N:] = uv[:N]
+    # Textura de tecido canelado (tintável).
+    size = 256
+    yy, xx = np.mgrid[0:size, 0:size] / size
+    rib = .5 + .5 * np.cos(2 * np.pi * xx * 24)
+    alb = (.86 + .1 * rib)
+    alb_img = Image.fromarray((np.stack([alb] * 3, -1) * 255).astype(np.uint8), 'RGB')
+    hgt = rib
+    gx = np.gradient(hgt, axis=1) * 3
+    nm = np.stack([-gx, np.zeros_like(gx), np.ones_like(gx)], -1)
+    nm /= np.linalg.norm(nm, axis=2, keepdims=True)
+    nm_img = Image.fromarray(((nm * .5 + .5) * 255).astype(np.uint8), 'RGB')
     b = ItemBuilder(model, item_id, 'headwear')
-    bake = cloth.bake_surface(s, 1024)
-    p = bake.pos[bake.mask].astype(np.float64)
-    n = bake.nrm[bake.mask]
-    part = bake.at('part')[:, 0]
-    alb = neutral(p, .93)
-    alb = np.where((part > 1.5)[:, None], alb * .8, alb)
-
-    def height(q):
-        return cloth.triplanar(q, n, lambda u, v: cloth.rib(u, v, .0028)) * 1.6 + (fbm(q, 1500, 2, 4) - .5) * .0002
-    a, nm, orm = cloth.finish(bake, np.clip(alb, 0, 1), np.full(len(p), .92), height)
-    mat = tex_material(b, 'band', a, nm, orm, color=color, tint='main', sheen=((.5, .5, .5), .8))
-    b.derived('band', s, mat)
+    mat = b.glb.material('band', color=(*lin(color), 1), base=b.glb.texture(alb_img, fmt='jpeg', quality=90),
+                         normal=b.glb.texture(nm_img, fmt='png'), roughness=.9, sheen=((.5, .5, .5), .8), extras={'tint': 'main'})
+    b.bound('band', pos, all_t, uv, mat, nrm=vertex_normals(pos, all_t), bone='Head')
     return b.save({})
 
 
@@ -475,10 +518,10 @@ def tattoo_sleeve(model, layout, item_id='tattoo_sleeve'):
     ref2 = np.cross(axis, ref)
     r = np.linalg.norm(radial, axis=1) + 1e-9
     ang = np.arctan2(radial @ ref2, radial @ ref)
-    u = ang * .035  # comprimento de arco aproximado
+    u = ang * r  # comprimento de arco
     v = l
     ink = np.zeros(len(p))
-    line = lambda d, wdt=.0007: smoothstep(wdt, wdt * .4, np.abs(d))
+    line = lambda d, wdt=.0012: smoothstep(wdt, wdt * .45, np.abs(d))
     # Punho: duas linhas e faixa de triângulos.
     for lv in (length * .9, length * .935):
         ink = np.maximum(ink, line(v - lv))
@@ -492,9 +535,9 @@ def tattoo_sleeve(model, layout, item_id='tattoo_sleeve'):
     psi = np.arctan2(dv, du)
     petal1 = .028 * (.55 + .45 * np.abs(np.cos(4 * psi)))
     petal2 = .04 * (.6 + .4 * np.abs(np.cos(4 * psi + np.pi / 4)))
-    ink = np.maximum(ink, line(rho - petal1, .0008))
-    ink = np.maximum(ink, line(rho - petal2, .0008) * (rho < .05))
-    ink = np.maximum(ink, line(rho - .009, .0007))
+    ink = np.maximum(ink, line(rho - petal1, .0013))
+    ink = np.maximum(ink, line(rho - petal2, .0013) * (rho < .05))
+    ink = np.maximum(ink, line(rho - .009, .0012))
     ink = np.maximum(ink, smoothstep(.0045, .0035, rho) * .9)
     dots = (rho > .042) & (rho < .052) & (np.abs(((psi / (2 * np.pi)) * 32) % 1 - .5) < .18) & (np.abs(rho - .047) < .0018)
     ink = np.maximum(ink, dots)
@@ -504,7 +547,7 @@ def tattoo_sleeve(model, layout, item_id='tattoo_sleeve'):
     # Geometria perto do cotovelo: losangos em faixa.
     band_e = (v > length * .12) & (v < length * .3)
     diam = np.abs(((u / .018) % 1) - .5) + np.abs(((v / .018) % 1) - .5)
-    ink = np.maximum(ink, band_e * line(diam - .35, .02))
+    ink = np.maximum(ink, band_e * line(diam - .35, .03))
     ink = np.maximum(ink, line(v - length * .11) + line(v - length * .31))
     # Linhas que conectam os motivos.
     ink = np.maximum(ink, line(u - .0) * (v > length * .31) * (v < c_v - .05))
@@ -532,20 +575,21 @@ def facepaint(model, layout, item_id='facepaint_midnight'):
     mouth = L.mouth_y
     rel = p - L.center
     aaz = np.abs(np.degrees(np.arctan2(rel[:, 0], rel[:, 2])))
-    face = (1 - smoothstep(58, 74, aaz)) * smoothstep(L.chin_y - .012, L.chin_y, y) * (1 - smoothstep(ey + .07, ey + .08, y))
+    edge_n = fbm(p, 90, 2, 11) - .5
+    face = (1 - smoothstep(42, 70, aaz + edge_n * 20)) * smoothstep(L.chin_y - .016, L.chin_y + .004, y) * (1 - smoothstep(ey + .055, ey + .085, y + edge_n * .02))
     white = np.array([.95, .94, .92])
     black = np.array([.07, .05, .08])
     red = np.array([.62, .05, .12])
     col = np.tile(white, (len(p), 1))
-    alpha = face * (.93 + .05 * fbm(p, 200, 2, 3))
+    alpha = face * (.9 + .08 * fbm(p, 200, 2, 3))
     # Losangos verticais atravessando os olhos.
     dia = np.abs(ax - ex) / .016 + np.abs(y - ey - .003) / .05
     dia_m = smoothstep(1.02, .96, dia) * (z > L.eyeL[2] - .03)
     col = cloth.lin_mix(col, black, dia_m)
     # Sorriso vermelho alongado + lábios.
     lips = smoothstep(.15, .5, overlays._bake['lips'])
-    smile_y = mouth - .002 + 9 * np.clip(ax - .018, 0, None) ** 2 * 10
-    smile = smoothstep(.0045, .003, np.abs(y - smile_y)) * (ax < .06) * (ax > .012) * (z > L.front_z - .08)
+    smile_y = mouth + 18 * np.clip(ax - .016, 0, None) ** 2
+    smile = smoothstep(.0035, .002, np.abs(y - smile_y)) * (1 - smoothstep(.036, .042, ax)) * (ax > .012) * (z > L.front_z - .08)
     col = cloth.lin_mix(col, red, np.clip(smile + lips, 0, 1))
     # Nariz vermelho.
     nose = smoothstep(.012, .009, np.hypot(x, y - (ey - .043))) * (z > L.front_z - .03)
