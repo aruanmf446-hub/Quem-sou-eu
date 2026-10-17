@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { CharacterStage, type CameraView } from '../components/CharacterStage';
+import { AvatarCreatorTrial } from './AvatarCreatorTrial';
 import { CHARACTERS, DANCES, type AvatarLook } from '../data/characters';
 import { buy } from '../lib/economy';
 import { getProfile, setProfile, useProfile } from '../lib/profile';
@@ -34,6 +35,7 @@ export function CharacterStudio() {
   const [environment, setEnvironment] = useState<Environment>('studio');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [trialOpen, setTrialOpen] = useState(false);
   const character = CHARACTERS.find(c => c.id === look.character) ?? CHARACTERS[0];
   const dance = DANCES.find(d => d.id === look.dance) ?? DANCES[0];
   const identity = IDENTITY[character.id];
@@ -57,8 +59,10 @@ export function CharacterStudio() {
     } catch (error) { setMessage((error as Error).message); }
     finally { setBusy(false); }
   }
+  if (trialOpen) return <AvatarCreatorTrial onClose={() => setTrialOpen(false)} />;
   return <div className="studio studio-v2" style={{ '--character-accent': identity.color } as React.CSSProperties}>
     <header className="lab-header"><div className="lab-wordmark"><span className="lab-symbol">Q<span>✦</span></span><div><b>CHARACTER<span>LAB</span></b><small>SEU PERSONAGEM. SUAS REGRAS.</small></div></div><div className="lab-header-note"><span className="live-dot" /> ESTÚDIO INTERATIVO <span className="lab-header-divider">/</span> 3D</div><span className="lab-edition">VOL. 01 — ORIGINALS</span></header>
+    <div className="studio-test-banner"><div><strong>NOVO · CRIADOR PRONTO</strong><span>Experimente um editor externo sem mexer nas suas compras ou personagens.</span></div><button type="button" onClick={() => setTrialOpen(true)}>TESTAR CRIADOR 3D ↗</button></div>
     <div className="lab-workspace">
       <section className={`lab-stage scene-${environment}`} aria-label="Estúdio de personagens 3D">
         <div className="lab-stage-grid" /><div className="lab-stage-halo" />
