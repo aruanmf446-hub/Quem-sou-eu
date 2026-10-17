@@ -67,19 +67,25 @@ def build(model, glb, skin_index):
     m_iris = glb.material('EyeIris', base=iris_tex, roughness=.35, extras={'irisColor': True})
     m_cornea = glb.material('EyeCornea', color=(1, 1, 1, .06), roughness=.02, alpha=('BLEND', 0),
                             clearcoat=(1.0, .02), extras={'cornea': True})
+    # Duas variantes: realista e estilo animação (íris maior), escolhidas no runtime pelo estilo.
+    for variant, iris_ratio in (('real', .5), ('toon', .64)):
+        build_side(model, glb, skin_index, m_sclera, m_iris, m_cornea, variant, iris_ratio)
+
+
+def build_side(model, glb, skin_index, m_sclera, m_iris, m_cornea, variant, iris_ratio):
     for side, src in (('Left', 'l'), ('Right', 'r')):
         helper = model.mesh.group_vertices(f'helper-{src}-eye')
         hp = model.coords[helper]
         c = hp.mean(0)
         radius = np.linalg.norm(hp - c, axis=1).mean() * .97
-        iris_angle = np.arcsin(.5)
+        iris_angle = np.arcsin(iris_ratio)
         # Esclera + íris (a íris é um plano recuado, como no olho real).
         pos, tris, theta = sphere(radius)
         flat = theta < iris_angle
         iris_z = radius * np.cos(iris_angle)
         pos[flat, 2] = iris_z + (pos[flat, 2] - iris_z) * .12
         tri_theta = theta[tris].mean(1)
-        uv = np.stack([.5 + pos[:, 0] / (2 * radius * .5), .5 - pos[:, 1] / (2 * radius * .5)], 1)
+        uv = np.stack([.5 + pos[:, 0] / (2 * radius * iris_ratio), .5 - pos[:, 1] / (2 * radius * iris_ratio)], 1)
         uv_s = np.stack([.5 + pos[:, 0] / (2 * radius), .5 - pos[:, 1] / (2 * radius)], 1)
         nrm = pos / np.linalg.norm(pos, axis=1, keepdims=True)
         nrm[flat] = nrm[flat] * .3 + np.array([0, 0, .7])
@@ -121,6 +127,6 @@ def build(model, glb, skin_index):
             joints, weights = top4(W)
             names, morphs = morphs_for(verts[used])
             prim = glb.primitive(verts[used], normals[used], uvs[used], remap[faces], mat, joints, weights, morphs)
-            mid = glb.mesh(f'eye_{part}_{src}', [prim], names, extras={'layer': 'eyes'})
-            node = glb.node(name=f'eye_{part}_{src}', mesh=mid, skin=skin_index)
+            mid = glb.mesh(f'eye_{part}_{src}_{variant}', [prim], names, extras={'layer': 'eyes', 'eyeSet': variant})
+            node = glb.node(name=f'eye_{part}_{src}_{variant}', mesh=mid, skin=skin_index)
             glb.doc['scenes'][0]['nodes'].append(node)

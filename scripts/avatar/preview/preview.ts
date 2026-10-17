@@ -42,7 +42,7 @@ const config: AvatarConfig = {
     avatar.model.traverse(o => {
       if (!(o as THREE.Mesh).isMesh) return;
       const n = o.name;
-      const head = /^body_head|^eye_|^lashes|^teeth|^tongue|^brows_/.test(n);
+      const head = /^body_head|^eye_.*_real|^lashes|^teeth|^tongue|^brows_/.test(n);
       o.visible = n.startsWith(only) || (keepHead && head) || (keepBody && o.visible && !n.startsWith('underwear'));
     });
   }

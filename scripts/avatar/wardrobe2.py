@@ -119,7 +119,11 @@ def bottoms_envelope(model, layout, A):
         sb, hem_y, top = shorts_surface(model, layout, A)
         for loop in classify_loops(sb)['hem']:
             G.band(sb, loop, lambda P: np.tile([0., 1, 0], (len(P), 1)), .026, rows=3, part=1, inward=.002)
-        P = sb.pos
+        sj, _ = pants_surface(model, layout, A, end_t=.9, ease_hip=.008, ease_knee=.036, ease_ankle=.014)
+        for loop in classify_loops(sj)['hem']:
+            G.band(sj, loop, lambda P: np.tile([0., 1, 0], (len(P), 1)), .035, rows=3, part=1, inward=.002)
+        sc, _ = pants_surface(model, layout, A, end_t=.88, ease_hip=.008, ease_knee=.03, ease_ankle=.055)
+        P = np.vstack([sb.pos, sj.pos, sc.pos])
         cz = .0
         r = np.hypot(P[:, 0], P[:, 2] - cz)
         th = np.arctan2(P[:, 0], P[:, 2] - cz)
@@ -399,7 +403,7 @@ def track_jacket(model, layout, item_id='top_track_jacket', color='#7c5ce0'):
             r = np.linalg.norm(relp, axis=1) + 1e-9
             ang = np.arccos(np.clip((relp @ out) / r, -1, 1)) * r
             on_arm = (part < .5) & (np.linalg.norm(rel, axis=1) < .07) & (np.sign(x) == sgn) & (np.abs(x) > .17)
-            stripes = np.maximum(stripes, smoothstep(.0035, .0022, np.abs(ang - .009)) * on_arm)
+            stripes = np.maximum(stripes, smoothstep(.0048, .0034, np.abs(ang - .011)) * on_arm)
     rgba[:, 3] = np.clip(zip_m + stripes, 0, 1)
     decal(b, s, bake, rgba, 'details', roughness=.35, metallic=0.)
     return b.save({'hides': ['chest', 'belly', 'upperarm_a', 'upperarm_b', 'upperarm_c', 'upperarm_d', 'forearm_a', 'forearm_b', 'forearm_c']})
@@ -782,23 +786,44 @@ def hightops(model, layout):
     return sneakers(model, layout, 'shoes_hightops', hightop=True, main_tint='#1c1f29')
 
 
+def hull_fill(s, factor=1.0):
+    """Projeta concavidades (dedos) no fecho convexo de cada pé."""
+    from scipy.spatial import ConvexHull
+    part = s.part if s.part is not None else np.zeros(len(s.pos))
+    nrm = G.vertex_normals_canon(s)
+    for sign in (1, -1):
+        m = (np.sign(s.pos[:, 0]) == sign) & (part < 1.5)
+        hull = ConvexHull(s.pos[m])
+        eq = hull.equations
+        P, D = s.pos[m], nrm[m]
+        inside = (P @ eq[:, :3].T + eq[:, 3]).max(1) < 0
+        num = -(P @ eq[:, :3].T + eq[:, 3])
+        den = D @ eq[:, :3].T
+        tt = np.where(den > 1e-6, num / np.maximum(den, 1e-6), np.inf).min(1)
+        tt = np.where(inside & np.isfinite(tt), np.minimum(tt, .04), 0)
+        s.pos[m] = P + D * tt[:, None] * factor
+
+
 def clown_shoes(model, layout, item_id='shoes_clown'):
     A = G.Anatomy(model)
     G.reset_strips()
     s = shoe_shell(model, layout, A, collar_t=.9, ease=.009)
-    # Alonga e arredonda a ponta: escala à frente do tornozelo.
+    # Forma de sapato de palhaço: frente projetada num superelipsoide alongado e liso.
     for side, sign in (('Left', 1), ('Right', -1)):
         ankle, f, lat = foot_frame(A, side)
         m = np.sign(s.pos[:, 0]) == sign
-        rel = s.pos[m] - ankle
-        fw = rel @ f
-        k = smoothstep(.0, .14, fw)
-        grow = 1 + .55 * k
-        lt = rel @ lat
-        up = s.pos[m, 1]
-        new = ankle + np.outer(fw * grow, f) + np.outer(lt * (1 + .35 * k), lat)
-        new[:, 1] = up + k * np.clip(up - .02, 0, None) * .7
-        s.pos[m] = new
+        P = s.pos[m]
+        rel = P - ankle
+        fw, lt, up = rel @ f, rel @ lat, P[:, 1]
+        c = np.array([.085, 0., .05])
+        rad = np.array([.175, .068, .05])
+        d = np.stack([fw - c[0], lt - c[1], up - c[2]], 1) / rad
+        e_ = 2.4
+        norm = (np.abs(d) ** e_).sum(1) ** (1 / e_)
+        target = d / np.maximum(norm, 1e-6)[:, None] * rad + c
+        k = smoothstep(-.03, .06, fw)
+        new = np.stack([fw, lt, up], 1) * (1 - k[:, None]) + target * k[:, None]
+        s.pos[m] = ankle * [1, 0, 1] + np.outer(new[:, 0], f) + np.outer(new[:, 1], lat) + np.outer(new[:, 2], [0, 1, 0])
     G.smooth(s, 8, keep_boundary=True)
     s.pos[:, 1] = np.maximum(s.pos[:, 1], .014)
     b = ItemBuilder(model, item_id, 'shoes')

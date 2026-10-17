@@ -12,6 +12,7 @@ from items import ItemBuilder
 from model import AvatarModel
 import overlays
 import hair
+import wardrobe
 import numpy as np
 
 REGISTRY = {}

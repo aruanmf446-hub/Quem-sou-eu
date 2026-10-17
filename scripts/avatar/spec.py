@@ -95,6 +95,12 @@ TARGET_MORPHS = {
     'ears_big': both('ears/{s}-ear-scale-incr'),
     'ears_small': both('ears/{s}-ear-scale-decr'),
     'ears_pointed': both('ears/{s}-ear-shape-pointed'),
+    # Estilo de animação: cabeça e olhos maiores, nariz e boca menores, pescoço fino.
+    'style_toon': [('head/head-scale-vert-incr', .9), ('head/head-scale-horiz-incr', .9), ('head/head-scale-depth-incr', .8),
+                   ('eyes/l-eye-scale-incr', 1.6), ('eyes/r-eye-scale-incr', 1.6), ('eyes/l-eye-height2-incr', .8), ('eyes/r-eye-height2-incr', .8),
+                   ('nose/nose-scale-horiz-decr', .5), ('nose/nose-scale-vert-decr', .5), ('nose/nose-scale-depth-decr', .4),
+                   ('mouth/mouth-scale-horiz-decr', .25), ('chin/chin-height-decr', .3), ('neck/measure-neck-circ-decr', .5),
+                   ('hands/l-hand-scale-incr', .5), ('hands/r-hand-scale-incr', .5)],
 }
 
 # Expressões faciais: as unidades existem por grupo étnico; usamos a média, igual à base.

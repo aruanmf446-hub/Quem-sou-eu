@@ -51,6 +51,7 @@ const FACE_SHAPES: { id: FaceShape; label: string }[] = [
   { id: 'natural', label: 'Natural' }, { id: 'oval', label: 'Oval' }, { id: 'round', label: 'Redondo' }, { id: 'square', label: 'Quadrado' }, { id: 'triangle', label: 'Triangular' },
 ];
 const BODY_SLIDERS: { key: keyof BodyShape; label: string; min?: number; left: string; right: string }[] = [
+  { key: 'style', label: 'Estilo', min: 0, left: 'Realista', right: 'Animação' },
   { key: 'type', label: 'Estrutura', min: 0, left: 'Masculina', right: 'Feminina' },
   { key: 'height', label: 'Altura', left: 'Baixa', right: 'Alta' },
   { key: 'muscle', label: 'Musculatura', left: 'Leve', right: 'Definida' },
@@ -285,7 +286,7 @@ export function AvatarStudio({ onPlay }: { onPlay?: () => void }) {
           </Section>
         </>}
 
-        {tab === 'body' && <Section title="Proporções" aside={<button type="button" className="as-link" onClick={() => update(c => ({ ...c, body: { ...DEFAULT_BODY, type: c.body.type } }))}>Redefinir</button>}>
+        {tab === 'body' && <Section title="Proporções" aside={<button type="button" className="as-link" onClick={() => update(c => ({ ...c, body: { ...DEFAULT_BODY, type: c.body.type, style: c.body.style } }))}>Redefinir</button>}>
           {BODY_SLIDERS.map(s => <Slider key={s.key} label={s.label} min={s.min} left={s.left} right={s.right} value={draft.body[s.key]} onChange={v => update(c => ({ ...c, body: { ...c.body, [s.key]: v } }))} />)}
         </Section>}
 

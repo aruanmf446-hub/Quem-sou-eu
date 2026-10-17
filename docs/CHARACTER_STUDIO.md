@@ -5,7 +5,7 @@ No menu, abra **Estúdio 3D**. Tudo acontece dentro do jogo: criar o personagem,
 ## O que o jogador faz
 
 1. **Visuais** — aplica um personagem original (Nova, Camisa 10, Riso da Meia-Noite) como ponto de partida e gerencia **Meus visuais** (até 12 combinações salvas).
-2. **Corpo** — estrutura masculina ↔ feminina, altura, musculatura, massa, ombros, tronco, quadril, pernas e cabeça.
+2. **Corpo** — estilo (realista ↔ animação: cabeça e olhos maiores), estrutura masculina ↔ feminina, altura, musculatura, massa, ombros, tronco, quadril, pernas e cabeça.
 3. **Rosto** — formato (oval, redondo, quadrado, triangular), mandíbula, queixo, maçãs, olhos (tamanho, distância, inclinação, cor), sobrancelhas, nariz, lábios, boca e orelhas.
 4. **Pele e cabelo** — 11 tons de pele + cor livre, estilos de cabelo, cor e pontas descoloridas, sobrancelhas e barba.
 5. **Roupas, Calçados, Acessórios** — peças gratuitas e premium, várias recoloríveis, com prévia 3D imediata.
@@ -17,7 +17,7 @@ O rodapé mostra o que falta comprar. **Comprar e equipar** abre a confirmação
 
 ## Arquitetura
 
-- **Base compartilhada** (`public/avatar/base.glb`): malha anatômica CC0 do MakeHuman com 67 morphs nomeados (corpo, rosto e expressões faciais), olhos, cílios, dentes e esqueleto padrão Mixamo (52 ossos + olhos). Proporções que movem juntas guardam o deslocamento de cada junta; o runtime reposiciona o esqueleto e recalcula o bind, sem rig manual.
+- **Base compartilhada** (`public/avatar/base.glb`): malha anatômica CC0 do MakeHuman com 68 morphs nomeados (corpo, rosto e expressões faciais), olhos, cílios, dentes e esqueleto padrão Mixamo (52 ossos + olhos). Proporções que movem juntas guardam o deslocamento de cada junta; o runtime reposiciona o esqueleto e recalcula o bind, sem rig manual.
 - **Peças modulares** (`public/avatar/items/*.glb`): cada roupa, calçado, cabelo ou acessório traz os mesmos nomes de ossos e de morphs. Ao vestir, a peça é religada ao esqueleto do avatar e acompanha qualquer corpo e rosto criados. Peças declaram as regiões do corpo que cobrem (`hides`), evitando que a pele atravesse o tecido.
 - **Animações** (`src/avatar/animation.ts`, `src/avatar/dances.ts`): coreografias originais descritas por poses-chave anatômicas, com IK das pernas (pés plantados), dedos e expressões faciais; compiladas uma vez em `AnimationClip`s por nome de osso. A mesma dança produz o mesmo movimento em todos os avatares.
 - **Runtime** (`src/avatar/Avatar.ts`, `AvatarView.tsx`, `stage.ts`): materiais PBR do three.js, pele com espalhamento subsuperficial aproximado, tecido com sheen, cabelo com pontas descoloridas, sombras suaves, piscar e olhar.

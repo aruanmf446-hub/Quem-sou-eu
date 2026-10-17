@@ -10,6 +10,8 @@ export interface BodyShape {
   hips: number;
   legs: number;
   head: number;
+  /** 0 = realista, 1 = estilo animação (cabeça e olhos maiores). */
+  style: number;
 }
 
 export type FaceShape = 'natural' | 'oval' | 'round' | 'square' | 'triangle';
@@ -56,7 +58,7 @@ export interface AvatarConfig {
   celebration: string;
 }
 
-export const DEFAULT_BODY: BodyShape = { type: 0, height: 0, muscle: 0, weight: 0, shoulders: 0, torso: 0, hips: 0, legs: 0, head: 0 };
+export const DEFAULT_BODY: BodyShape = { type: 0, height: 0, muscle: 0, weight: 0, shoulders: 0, torso: 0, hips: 0, legs: 0, head: 0, style: 0 };
 export const DEFAULT_FACE: FaceConfig = {
   shape: 'natural', shapeAmount: .6, width: 0, jaw: 0, chin: 0, cheekbones: 0, eyeSize: 0, eyeDistance: 0, eyeTilt: 0,
   noseWidth: 0, noseLength: 0, noseTip: 0, lips: 0, mouthWidth: 0, browHeight: 0, browAngle: 0, ears: 0, earShape: 0,
@@ -84,6 +86,7 @@ export function morphInfluences(config: Pick<AvatarConfig, 'body' | 'face'>): Re
   pair(clamp(b.hips), 'hips_wide', 'hips_narrow', out);
   pair(clamp(b.legs), 'legs_long', 'legs_short', out, .8);
   pair(clamp(b.head), 'head_big', 'head_small', out);
+  if (b.style > 0) out.style_toon = clamp(b.style, 0, 1);
   if (f.shape !== 'natural') out[`face_${f.shape}`] = clamp(f.shapeAmount, 0, 1);
   pair(clamp(f.width), 'face_wide', 'face_narrow', out);
   pair(clamp(f.jaw), 'jaw_strong', 'jaw_soft', out);
@@ -112,7 +115,7 @@ function numbers<T extends object>(defaults: T, raw: unknown): T {
   if (raw && typeof raw === 'object') {
     for (const [k, v] of Object.entries(defaults)) {
       const r = (raw as Record<string, unknown>)[k];
-      if (typeof v === 'number' && typeof r === 'number' && Number.isFinite(r)) out[k] = clamp(r, k === 'type' || k === 'shapeAmount' || k === 'earShape' ? 0 : -1, 1);
+      if (typeof v === 'number' && typeof r === 'number' && Number.isFinite(r)) out[k] = clamp(r, k === 'type' || k === 'style' || k === 'shapeAmount' || k === 'earShape' ? 0 : -1, 1);
       if (typeof v === 'string' && typeof r === 'string') out[k] = r;
     }
   }

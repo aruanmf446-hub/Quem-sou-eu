@@ -204,6 +204,7 @@ export class Avatar {
   setShape(config: Pick<AvatarConfig, 'body' | 'face'>) {
     this.influences = morphInfluences(config);
     this.feminine = config.body.type;
+    this.toon = (config.body.style ?? 0) >= .45;
     this.recomputeBind();
     this.applyMorphs();
     this.updateVisibility();
@@ -306,12 +307,14 @@ export class Avatar {
     for (const [region, meshes] of this.regions) for (const m of meshes) m.visible = !hidden.has(region);
     // Roupa íntima neutra da base: aparece só quando a peça correspondente não está vestida.
     for (const { mesh } of this.parts) {
+      if (mesh.userData.eyeSet) mesh.visible = (mesh.userData.eyeSet === 'toon') === this.toon;
       if (mesh.userData.layer === 'underwear_bottom') mesh.visible = !this.equipped.has('bottom');
       if (mesh.userData.layer === 'underwear_top') mesh.visible = !this.equipped.has('top') && this.feminine > .3;
     }
   }
 
   private feminine = 0;
+  private toon = false;
 
   lookAt(target: THREE.Vector3 | null) { this.lookTarget = target; }
 
