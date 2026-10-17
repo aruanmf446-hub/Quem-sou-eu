@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
-import { morphInfluences, type AvatarConfig } from './config';
+import { morphInfluences, restExpression, type AvatarConfig } from './config';
 import { applyHairTips, makeSkinMaterial, skinToneColors, type SkinUniforms } from './materials';
 import { compile, PoseSolver, RestSkeleton, sampleFace, type CompiledClip } from './animation';
 import { CHOREOGRAPHIES } from './dances';
@@ -234,6 +234,8 @@ export class Avatar {
   /** Corpo e rosto: aplica morphs em todas as peças e reposiciona as juntas. */
   setShape(config: Pick<AvatarConfig, 'body' | 'face'>) {
     this.influences = morphInfluences(config);
+    this.rest = restExpression(config.face);
+    for (const name of EXPRESSIONS) if (!name.startsWith('expr_blink')) this.expression[name] = Math.max(this.animatedExpression[name] ?? 0, this.rest[name] ?? 0);
     this.feminine = config.body.type;
     this.toon = (config.body.style ?? 0) >= .45;
     // Estilo animação: pele mais lisa (menos poros) e bochechas levemente coradas.
@@ -407,6 +409,7 @@ export class Avatar {
       if (this.blinkPhase >= 1) this.blinkPhase = -1;
     }
     const base: Record<string, number> = { ...this.animatedExpression };
+    for (const [name, v] of Object.entries(this.rest)) base[name] = Math.max(base[name] ?? 0, v);
     this.fading = this.fading.filter(f => f.action.getEffectiveWeight() > .001 && f.action.isRunning());
     for (const f of [...this.fading, ...(this.current ? [this.current] : [])]) sampleFace(f.face, f.action.time, base, f.action.getEffectiveWeight());
     for (const name of EXPRESSIONS) this.expression[name] = Math.min(1, base[name] ?? 0);
@@ -429,6 +432,8 @@ export class Avatar {
 
   /** Expressões definidas pela animação atual (atualizadas pelo controlador de danças). */
   animatedExpression: Record<string, number> = {};
+  /** Expressão de repouso do personagem (sorriso, olhar, sobrancelhas). */
+  private rest: Record<string, number> = {};
 
   /** Altura atual do topo da cabeça em metros (para enquadrar a câmera). */
   headHeight() {

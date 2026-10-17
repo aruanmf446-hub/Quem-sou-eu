@@ -168,7 +168,7 @@ export const BUNDLES: Bundle[] = [
     id: 'street', name: 'Nova', subtitle: 'Seu estilo começa aqui', price: 0, color: '#8463df',
     config: base({
       body: { ...DEFAULT_BODY, type: 1, muscle: .1, height: -.15 },
-      face: { ...DEFAULT_FACE, shape: 'oval', shapeAmount: .5, lips: .35, eyeSize: .35, noseWidth: -.3, jaw: -.4 },
+      face: { ...DEFAULT_FACE, shape: 'oval', shapeAmount: .5, lips: .35, eyeSize: .35, noseWidth: -.3, jaw: -.4, eyeShape: -.3, cheeks: .1, mouthCorners: .3, smile: .35 },
       skinTone: '#bd8058', eyeColor: '#4a2c1a', hairColor: '#1d1418',
       items: { hair: 'hair_bun', brows: 'brows_arched', beard: null, top: 'top_track_jacket', bottom: 'bottom_joggers', socks: 'socks_crew', shoes: 'shoes_hightops', headwear: null, eyewear: null, neck: null, wrist: null, bodyart: null },
       tints: { 'top_track_jacket:main': '#7c5ce0', 'bottom_joggers:main': '#1e2230', 'shoes_hightops:main': '#1c1f29' },
@@ -178,7 +178,7 @@ export const BUNDLES: Bundle[] = [
     id: 'striker', name: 'Camisa 10', subtitle: 'Talento de sobra, dentro e fora do campo', price: 150, color: '#efc51d',
     config: base({
       body: { ...DEFAULT_BODY, muscle: .25, legs: .1 },
-      face: { ...DEFAULT_FACE, jaw: .35, chin: .2, cheekbones: .3 },
+      face: { ...DEFAULT_FACE, jaw: .35, chin: .2, cheekbones: .3, cheeks: -.3, age: .15, mouthCorners: .3, smile: .5, browMood: -.15 },
       skinTone: '#8d5a3b', eyeColor: '#3a2215', hairColor: '#2b1d14', hairTips: '#e2bf7a',
       items: { hair: 'hair_curly_fade', brows: 'brows_thick', beard: 'beard_goatee', top: 'top_jersey_10', bottom: 'bottom_shorts_10', socks: 'socks_football_10', shoes: 'shoes_cleats_10', headwear: null, eyewear: null, neck: null, wrist: null, bodyart: 'tattoo_sleeve' },
       dance: 'samba', celebration: 'airplane',
@@ -188,7 +188,7 @@ export const BUNDLES: Bundle[] = [
     id: 'night-clown', name: 'Riso da Meia-Noite', subtitle: 'Um espetáculo de arrepiar', price: 250, color: '#c2b9a4',
     config: base({
       body: { ...DEFAULT_BODY, muscle: -.2, weight: -.2, height: .25, legs: .3 },
-      face: { ...DEFAULT_FACE, shape: 'triangle', shapeAmount: .6, cheekbones: .7, chin: .5, mouthWidth: .5, earShape: .4 },
+      face: { ...DEFAULT_FACE, shape: 'triangle', shapeAmount: .6, cheekbones: .7, chin: .5, mouthWidth: .5, earShape: .4, cheeks: -.7, faceLength: .6, mouthCorners: 1, smile: .7, squint: .3, browMood: .3 },
       skinTone: '#e9dccf', eyeColor: '#7a4d1c', hairColor: '#d9481c',
       items: { hair: 'hair_clown', brows: 'brows_arched', beard: null, top: 'top_clown_tunic', bottom: 'bottom_clown_pants', socks: null, shoes: 'shoes_clown', headwear: null, eyewear: null, neck: null, wrist: null, bodyart: 'facepaint_midnight' },
       dance: 'thriller', celebration: 'shh',
@@ -197,9 +197,9 @@ export const BUNDLES: Bundle[] = [
   {
     id: 'sky-mechanic', name: 'Mecânica dos Céus', subtitle: 'Conserta dirigíveis com uma chave e um sorriso', price: 320, color: '#e8735a',
     config: base({
-      body: { ...DEFAULT_BODY, type: 1, style: .85, muscle: .1, height: -.2 },
-      face: { ...DEFAULT_FACE, shape: 'round', shapeAmount: .4, noseTip: .4, lips: .2 },
-      skinTone: '#e9c3a3', eyeColor: '#6b4423', hairColor: '#a8401f',
+      body: { ...DEFAULT_BODY, type: 1, style: .8, muscle: .3, weight: .15, height: -.3, shoulders: .2, head: .1 },
+      face: { ...DEFAULT_FACE, shape: 'round', shapeAmount: .8, width: .35, jaw: -.3, chin: -.2, cheekbones: -.3, eyeSize: .2, eyeDistance: .25, eyeTilt: .1, noseWidth: .15, noseLength: -.6, noseTip: .8, lips: .1, mouthWidth: .5, browHeight: .25, browAngle: .2, cheeks: .55, eyeShape: .5, age: -.3, noseBridge: -.6, mouthCorners: .6, faceLength: -.4, smile: .9, squint: .25, browMood: .25 },
+      skinTone: '#f2c9a8', eyeColor: '#3f7a3a', hairColor: '#a8401f',
       items: { hair: 'hair_wild_ponytail', brows: 'brows_arched', beard: null, top: 'top_aviator_jacket', bottom: 'bottom_cargo_navy', socks: null, shoes: 'shoes_lace_boots', headwear: 'goggles_brass', hands: 'gloves_fingerless', belt: 'belt_tool_harness', back: 'scarf_wind', prop: 'prop_wrench', eyewear: null, neck: null, wrist: null, bodyart: null },
       tints: { 'scarf_wind:main': '#e8735a' }, dance: 'groove', celebration: 'flex',
     }),
@@ -207,9 +207,9 @@ export const BUNDLES: Bundle[] = [
   {
     id: 'astronomer', name: 'Astrônoma', subtitle: 'Lê o futuro no movimento dos planetas', price: 320, color: '#3d4f9e',
     config: base({
-      body: { ...DEFAULT_BODY, type: 1, style: .85, height: -.25, weight: .1 },
-      face: { ...DEFAULT_FACE, shape: 'round', shapeAmount: .5, eyeSize: .4 },
-      skinTone: '#d9a47f', eyeColor: '#3d6a7a', hairColor: '#1f2a5c',
+      body: { ...DEFAULT_BODY, type: 1, style: .85, height: .1, weight: -.1, legs: .3, shoulders: -.2 },
+      face: { ...DEFAULT_FACE, shape: 'oval', shapeAmount: .9, width: -.35, jaw: -.6, chin: .25, cheekbones: .6, eyeSize: .75, eyeDistance: -.1, eyeTilt: -.35, noseWidth: .25, noseLength: .1, noseTip: .1, lips: .7, mouthWidth: -.25, browHeight: .35, browAngle: -.3, cheeks: -.2, eyeShape: -.7, age: -.1, noseBridge: .1, mouthCorners: .2, faceLength: .3, smile: .3, squint: .4, browMood: .2 },
+      skinTone: '#9a6040', eyeColor: '#d9a43a', hairColor: '#1f2a5c',
       items: { hair: 'hair_wavy_long', brows: 'brows_thick', beard: null, top: 'top_star_tunic', bottom: 'bottom_star_pants', socks: null, shoes: 'shoes_gold_boots', headwear: 'circlet_gear', back: 'back_star_capelet', belt: 'belt_compass', wrist: 'bracers_leather', prop: 'prop_orrery_staff', hands: null, eyewear: null, neck: null, bodyart: null },
       dance: 'groove', celebration: 'heart',
     }),
@@ -217,9 +217,9 @@ export const BUNDLES: Bundle[] = [
   {
     id: 'harlequin', name: 'Arlequina', subtitle: 'O espetáculo explode quando ela entra', price: 320, color: '#e0367d',
     config: base({
-      body: { ...DEFAULT_BODY, type: 1, style: .9, height: -.1, hips: .3, legs: .3 },
-      face: { ...DEFAULT_FACE, shape: 'oval', shapeAmount: .4, eyeSize: .5, mouthWidth: .3 },
-      skinTone: '#f3d6c1', eyeColor: '#8a2a5c', hairColor: '#e0367d', hairTips: '#2ec4c4',
+      body: { ...DEFAULT_BODY, type: 1, style: 1, height: -.25, hips: .3, legs: .3, head: .2, weight: -.2 },
+      face: { ...DEFAULT_FACE, shape: 'triangle', shapeAmount: .75, width: .1, jaw: -.5, chin: .5, cheekbones: .8, eyeSize: 1, eyeDistance: .3, eyeTilt: .8, noseWidth: -.5, noseLength: -.7, noseTip: 1, lips: .45, mouthWidth: .7, browHeight: .45, browAngle: .9, earShape: .25, cheeks: .4, eyeShape: .9, age: -.9, noseBridge: -.9, mouthCorners: 1, faceLength: -.6, smile: 1, squint: .1, browMood: .5 },
+      skinTone: '#f7e1d3', eyeColor: '#1fa8a4', hairColor: '#e0367d', hairTips: '#2ec4c4',
       items: { hair: 'hair_curly_pigtails', brows: 'brows_arched', beard: null, top: 'top_harlequin', bottom: 'bottom_puff_shorts', socks: 'socks_harlequin', shoes: 'shoes_jester', headwear: 'hat_jester', hands: 'gloves_ruffle', prop: 'prop_bomb', bodyart: 'facepaint_diamond', back: null, belt: null, eyewear: null, neck: null, wrist: null },
       dance: 'thriller', celebration: 'jump',
     }),
@@ -237,9 +237,9 @@ export const BUNDLES: Bundle[] = [
   {
     id: 'volt', name: 'Cientista Voltaico', subtitle: 'Cada experimento termina em faísca', price: 320, color: '#3b8cff',
     config: base({
-      body: { ...DEFAULT_BODY, style: .85, muscle: -.1, height: .1, legs: .3 },
-      face: { ...DEFAULT_FACE, shape: 'triangle', shapeAmount: .4, chin: .3, browAngle: .4 },
-      skinTone: '#e9c3a3', eyeColor: '#2f7ad8', hairColor: '#2f7ad8',
+      body: { ...DEFAULT_BODY, style: .7, muscle: -.3, weight: -.3, height: .3, legs: .3, head: -.1 },
+      face: { ...DEFAULT_FACE, shape: 'square', shapeAmount: .5, width: -.55, jaw: .8, chin: .9, cheekbones: .9, eyeSize: -.1, eyeDistance: -.35, eyeTilt: -.15, noseWidth: -.3, noseLength: .9, noseTip: -.5, lips: -.6, mouthWidth: .35, browHeight: -.25, browAngle: 1, ears: .35, cheeks: -.9, eyeShape: -.5, age: .7, noseBridge: 1, mouthCorners: -.2, faceLength: 1, smile: .5, squint: .5, browMood: -.6 },
+      skinTone: '#e8cbb4', eyeColor: '#2f7ad8', hairColor: '#2f7ad8',
       items: { hair: 'hair_spiky', brows: 'brows_thick', beard: null, top: 'top_lab_coat', bottom: 'bottom_cargo_dark', socks: null, shoes: 'shoes_buckle_boots', headwear: 'goggles_brass', hands: 'hands_mech_arm', belt: 'belt_bolt', back: null, prop: null, eyewear: null, neck: null, wrist: null, bodyart: null },
       dance: 'robot', celebration: 'jump',
     }),

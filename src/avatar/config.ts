@@ -35,6 +35,18 @@ export interface FaceConfig {
   browAngle: number;
   ears: number;
   earShape: number;
+  /** Traços de personagem: bochechas (magras ↔ cheias), olhos (amendoados ↔ redondos), idade (jovem ↔ madura),
+   *  nariz (arrebitado ↔ aquilino), cantos da boca (caídos ↔ erguidos), rosto (curto ↔ comprido). */
+  cheeks: number;
+  eyeShape: number;
+  age: number;
+  noseBridge: number;
+  mouthCorners: number;
+  faceLength: number;
+  /** Expressão de repouso (personalidade): sorriso 0..1, olhar semicerrado 0..1, sobrancelhas -1 (franzidas) .. 1 (erguidas). */
+  smile: number;
+  squint: number;
+  browMood: number;
 }
 
 /** Slots do guarda-roupa. Cada item ocupa exatamente um slot. */
@@ -62,6 +74,8 @@ export const DEFAULT_BODY: BodyShape = { type: 0, height: 0, muscle: 0, weight: 
 export const DEFAULT_FACE: FaceConfig = {
   shape: 'natural', shapeAmount: .6, width: 0, jaw: 0, chin: 0, cheekbones: 0, eyeSize: 0, eyeDistance: 0, eyeTilt: 0,
   noseWidth: 0, noseLength: 0, noseTip: 0, lips: 0, mouthWidth: 0, browHeight: 0, browAngle: 0, ears: 0, earShape: 0,
+  cheeks: 0, eyeShape: 0, age: 0, noseBridge: 0, mouthCorners: 0, faceLength: 0,
+  smile: 0, squint: 0, browMood: 0,
 };
 
 export const clamp = (v: number, a = -1, b = 1) => Math.min(b, Math.max(a, Number.isFinite(v) ? v : 0));
@@ -69,6 +83,15 @@ const pair = (v: number, up: string, down: string, out: Record<string, number>, 
   if (v > 0) out[up] = (out[up] ?? 0) + v * k;
   else if (v < 0) out[down] = (out[down] ?? 0) - v * k;
 };
+
+/** Expressão de repouso do rosto (somada às expressões das danças, que podem ir além). */
+export function restExpression(face: Partial<FaceConfig>): Record<string, number> {
+  const smile = clamp(face.smile ?? 0, 0, 1), squint = clamp(face.squint ?? 0, 0, 1), mood = clamp(face.browMood ?? 0);
+  return {
+    expr_smile: smile * .75, expr_grin: smile * .3, expr_squint: squint * .7 + smile * .15,
+    expr_brows_up: Math.max(0, mood) * .7, expr_brows_down: Math.max(0, -mood) * .7,
+  };
+}
 
 /** Converte a configuração em influências dos morph targets compartilhados. */
 export function morphInfluences(config: Pick<AvatarConfig, 'body' | 'face'>): Record<string, number> {
@@ -104,6 +127,12 @@ export function morphInfluences(config: Pick<AvatarConfig, 'body' | 'face'>): Re
   pair(clamp(f.browAngle), 'brows_angle_up', 'brows_angle_down', out);
   pair(clamp(f.ears), 'ears_big', 'ears_small', out);
   if (f.earShape > 0) out.ears_pointed = clamp(f.earShape, 0, 1);
+  pair(clamp(f.cheeks ?? 0), 'cheeks_full', 'cheeks_hollow', out);
+  pair(clamp(f.eyeShape ?? 0), 'eyes_round', 'eyes_almond', out);
+  pair(clamp(f.age ?? 0), 'face_mature', 'face_young', out);
+  pair(clamp(f.noseBridge ?? 0), 'nose_aquiline', 'nose_button', out);
+  pair(clamp(f.mouthCorners ?? 0), 'mouth_corners_up', 'mouth_corners_down', out);
+  pair(clamp(f.faceLength ?? 0), 'face_long', 'face_short', out);
   return out;
 }
 
@@ -115,7 +144,7 @@ function numbers<T extends object>(defaults: T, raw: unknown): T {
   if (raw && typeof raw === 'object') {
     for (const [k, v] of Object.entries(defaults)) {
       const r = (raw as Record<string, unknown>)[k];
-      if (typeof v === 'number' && typeof r === 'number' && Number.isFinite(r)) out[k] = clamp(r, k === 'type' || k === 'style' || k === 'shapeAmount' || k === 'earShape' ? 0 : -1, 1);
+      if (typeof v === 'number' && typeof r === 'number' && Number.isFinite(r)) out[k] = clamp(r, k === 'type' || k === 'style' || k === 'shapeAmount' || k === 'earShape' || k === 'smile' || k === 'squint' ? 0 : -1, 1);
       if (typeof v === 'string' && typeof r === 'string') out[k] = r;
     }
   }

@@ -66,16 +66,23 @@ const FACE_GROUPS: { title: string; items: { key: keyof FaceConfig; label: strin
   { title: 'Estrutura', items: [
     { key: 'width', label: 'Largura', left: 'Fino', right: 'Largo' }, { key: 'jaw', label: 'Mandíbula', left: 'Suave', right: 'Marcada' },
     { key: 'chin', label: 'Queixo', left: 'Recuado', right: 'Projetado' }, { key: 'cheekbones', label: 'Maçãs do rosto', left: 'Baixas', right: 'Altas' },
+    { key: 'faceLength', label: 'Comprimento', left: 'Curto', right: 'Comprido' }, { key: 'cheeks', label: 'Bochechas', left: 'Magras', right: 'Cheias' },
+    { key: 'age', label: 'Idade aparente', left: 'Jovem', right: 'Madura' },
   ] },
   { title: 'Olhos', items: [
     { key: 'eyeSize', label: 'Tamanho', left: 'Menores', right: 'Maiores' }, { key: 'eyeDistance', label: 'Distância', left: 'Próximos', right: 'Afastados' },
-    { key: 'eyeTilt', label: 'Inclinação', left: 'Para baixo', right: 'Para cima' },
+    { key: 'eyeShape', label: 'Formato', left: 'Amendoados', right: 'Redondos' }, { key: 'eyeTilt', label: 'Inclinação', left: 'Para baixo', right: 'Para cima' },
     { key: 'browHeight', label: 'Altura da sobrancelha', left: 'Baixa', right: 'Alta' }, { key: 'browAngle', label: 'Ângulo da sobrancelha', left: 'Caído', right: 'Arqueado' },
   ] },
   { title: 'Nariz e boca', items: [
     { key: 'noseWidth', label: 'Largura do nariz', left: 'Fino', right: 'Largo' }, { key: 'noseLength', label: 'Comprimento do nariz', left: 'Curto', right: 'Longo' },
-    { key: 'noseTip', label: 'Ponta do nariz', left: 'Para baixo', right: 'Arrebitada' },
+    { key: 'noseTip', label: 'Ponta do nariz', left: 'Para baixo', right: 'Arrebitada' }, { key: 'noseBridge', label: 'Perfil do nariz', left: 'Côncavo', right: 'Aquilino' },
     { key: 'lips', label: 'Lábios', left: 'Finos', right: 'Volumosos' }, { key: 'mouthWidth', label: 'Largura da boca', left: 'Estreita', right: 'Larga' },
+    { key: 'mouthCorners', label: 'Cantos da boca', left: 'Caídos', right: 'Erguidos' },
+  ] },
+  { title: 'Expressão', items: [
+    { key: 'smile', label: 'Sorriso', min: 0, left: 'Sério', right: 'Sorridente' }, { key: 'squint', label: 'Olhar', min: 0, left: 'Aberto', right: 'Semicerrado' },
+    { key: 'browMood', label: 'Sobrancelhas', left: 'Franzidas', right: 'Erguidas' },
   ] },
   { title: 'Orelhas', items: [
     { key: 'ears', label: 'Tamanho', left: 'Pequenas', right: 'Grandes' }, { key: 'earShape', label: 'Pontas', min: 0, left: 'Redondas', right: 'Pontudas' },

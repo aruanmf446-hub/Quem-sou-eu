@@ -6,7 +6,7 @@ No menu, abra **Estúdio 3D**. Tudo acontece dentro do jogo: criar o personagem,
 
 1. **Visuais** — aplica um personagem original (Nova, Camisa 10, Riso da Meia-Noite e as cinco coleções estilizadas abaixo) como ponto de partida e gerencia **Meus visuais** (até 12 combinações salvas).
 2. **Corpo** — estilo (realista ↔ animação: cabeça e olhos maiores), estrutura masculina ↔ feminina, altura, musculatura, massa, ombros, tronco, quadril, pernas e cabeça.
-3. **Rosto** — formato (oval, redondo, quadrado, triangular), mandíbula, queixo, maçãs, olhos (tamanho, distância, inclinação, cor), sobrancelhas, nariz, lábios, boca e orelhas.
+3. **Rosto** — formato (oval, redondo, quadrado, triangular), comprimento, bochechas, idade aparente, mandíbula, queixo, maçãs, olhos (formato, tamanho, distância, inclinação, cor), sobrancelhas, nariz (inclusive perfil), lábios, boca (inclusive cantos) e orelhas, além da **expressão de repouso** (sorriso, olhar semicerrado, sobrancelhas erguidas ou franzidas), que se soma às expressões das danças.
 4. **Pele e cabelo** — 11 tons de pele + cor livre, estilos de cabelo, cor e pontas descoloridas, sobrancelhas e barba.
 5. **Roupas, Calçados, Acessórios** — peças gratuitas e premium, várias recoloríveis, com prévia 3D imediata.
 6. **Danças** — 4 danças e 5 comemorações, com prévia, pausa e velocidade.
@@ -27,11 +27,13 @@ Cinco personagens em estilo animação (cabeça e olhos maiores pelo morph `styl
 | **Guardião Anúbis** (`anubis`) | máscara de chacal com nemes azul e dourado (esconde rosto e cabelo), colar usekh, faixas cruzadas com medalhão, saiote de linho pregueado com avental listrado, manto azul-noite (recolorível), braceletes, grevas douradas com sandálias, cetro solar |
 | **Cientista Voltaico** (`volt`) | cabelo azul espetado, jaleco longo com frisos dourados e dragona, calça de laboratório, botas de fivela, braço mecânico com tubos emissivos e dedos presos aos ossos, cinto do raio e os óculos de aviador da Mecânica |
 
+Cada personagem tem rosto e corpo próprios: a Mecânica tem rosto redondo, bochechas cheias, nariz arrebitado e sorrisão; a Astrônoma, rosto oval comprido, olhos amendoados e caídos e lábios cheios; a Arlequina, rosto de coração, olhos redondos enormes inclinados e sorriso travesso; o Voltaico, rosto comprido e magro, queixo forte, nariz aquilino e sobrancelhas de cientista maluco. Cor de pele, olhos, altura, massa e tamanho da cabeça também variam.
+
 Objetos de mão (chave inglesa, cajado, bomba, cetro) usam a pegada do runtime (`grip`: `fist`, `staff` ou `open`) e foram conferidos parados e nas danças. Os chapéus, a máscara e o cabelo longo foram posicionados sobre os penteados das próprias coleções.
 
 ## Arquitetura
 
-- **Base compartilhada** (`public/avatar/base.glb`): malha anatômica CC0 do MakeHuman com 68 morphs nomeados (corpo, rosto e expressões faciais), olhos, cílios, dentes e esqueleto padrão Mixamo (52 ossos + olhos). Proporções que movem juntas guardam o deslocamento de cada junta; o runtime reposiciona o esqueleto e recalcula o bind, sem rig manual.
+- **Base compartilhada** (`public/avatar/base.glb`): malha anatômica CC0 do MakeHuman com 80 morphs nomeados (corpo, rosto, traços de personagem e expressões faciais), olhos, cílios, dentes e esqueleto padrão Mixamo (52 ossos + olhos). Proporções que movem juntas guardam o deslocamento de cada junta; o runtime reposiciona o esqueleto e recalcula o bind, sem rig manual.
 - **Peças modulares** (`public/avatar/items/*.glb`): cada roupa, calçado, cabelo ou acessório traz os mesmos nomes de ossos e de morphs. Ao vestir, a peça é religada ao esqueleto do avatar e acompanha qualquer corpo e rosto criados. Peças declaram as regiões do corpo que cobrem (`hides`), evitando que a pele atravesse o tecido.
 - **Animações** (`src/avatar/animation.ts`, `src/avatar/dances.ts`): coreografias originais descritas por poses-chave anatômicas, com IK das pernas (pés plantados), dedos e expressões faciais; compiladas uma vez em `AnimationClip`s por nome de osso. A mesma dança produz o mesmo movimento em todos os avatares.
 - **Runtime** (`src/avatar/Avatar.ts`, `AvatarView.tsx`, `stage.ts`): materiais PBR do three.js, pele com espalhamento subsuperficial aproximado, tecido com sheen, cabelo com pontas descoloridas, sombras suaves, piscar e olhar.
