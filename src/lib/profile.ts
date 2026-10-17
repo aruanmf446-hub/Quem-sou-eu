@@ -1,11 +1,19 @@
 import { useSyncExternalStore } from 'react';
 import { DEFAULT_LOOK, type AvatarLook } from '../data/characters';
+import type { AvatarConfig } from '../avatar/config';
 import type { Deck, Skin } from '../game/types';
 import { OFFICIAL_DECKS } from '../data/decks';
 
 export interface StoryProgress {
   unlocked: number;
   best: Record<number, { coins: number; cards: number }>;
+}
+
+export interface SavedOutfit {
+  id: string;
+  name: string;
+  config: AvatarConfig;
+  updatedAt: number;
 }
 
 export interface Profile {
@@ -19,7 +27,13 @@ export interface Profile {
   ownedDecks: string[];
   ownedCharacters: string[];
   ownedDances: string[];
+  /** Peças avulsas do guarda-roupa 3D compradas com moedas. */
+  ownedItems: string[];
   avatar: AvatarLook;
+  /** Combinações salvas no Estúdio 3D. */
+  outfits: SavedOutfit[];
+  /** Retrato do avatar equipado (imagem local, não sincronizada). */
+  avatarPortrait?: string;
   customDecks: Deck[];
   selectedDeckId: string;
   story: StoryProgress;
@@ -44,7 +58,9 @@ export function defaultProfile(): Profile {
     ownedDecks: OFFICIAL_DECKS.filter((d) => d.price === 0).map((d) => d.id),
     ownedCharacters: ['street'],
     ownedDances: ['groove'],
+    ownedItems: [],
     avatar: { ...DEFAULT_LOOK },
+    outfits: [],
     customDecks: [],
     selectedDeckId: 'espaco',
     story: { unlocked: 1, best: {} },

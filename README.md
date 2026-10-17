@@ -33,6 +33,6 @@ Defina `VITE_ASSETS_BASE_URL` e suba os arquivos seguindo [docs/ASSETS.md](docs/
 
 É um site estático (`dist/`): funciona no Vercel, no Cloudflare Pages ou no Netlify. Configure as mesmas variáveis `VITE_*` no painel da hospedagem.
 
-## Personagens 3D e danças
+## Estúdio 3D
 
-Abra **Estúdio 3D** para criar um visual a partir de presets, experimentar danças e comprar skins/animações com moedas do jogo. O personagem equipado dança no menu Jogar. Para ativar o catálogo online, aplique também a nova migração de personagens. Detalhes e limites em [docs/CHARACTER_STUDIO.md](docs/CHARACTER_STUDIO.md).
+Abra **Estúdio 3D** para criar seu personagem (corpo, rosto, pele, cabelo), vestir roupas, calçados e acessórios, escolher danças e comemorações, comprar com moedas e salvar combinações. O avatar equipado dança no lobby, aparece na partida e comemora na vitória. Para o modo online, aplique também `supabase/migrations/20261017200000_avatar_creator.sql`. Detalhes, arquitetura e limites em [docs/CHARACTER_STUDIO.md](docs/CHARACTER_STUDIO.md); pipeline de assets e licenças em [scripts/avatar/README.md](scripts/avatar/README.md).

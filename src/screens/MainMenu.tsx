@@ -1,6 +1,7 @@
-import { lazy, Suspense, useState } from 'react';
-const CharacterStage = lazy(() => import('../components/CharacterStage').then(m => ({ default: m.CharacterStage })));
-const CharacterStudio = lazy(() => import('./CharacterStudio').then(m => ({ default: m.CharacterStudio })));
+import { lazy, Suspense, useMemo, useState } from 'react';
+const AvatarView = lazy(() => import('../avatar/AvatarView').then(m => ({ default: m.AvatarView })));
+const AvatarStudio = lazy(() => import('./AvatarStudio').then(m => ({ default: m.AvatarStudio })));
+import { resolveConfig } from '../avatar/ownership';
 import { audio } from '../audio/music';
 import { maxPlayersForDeck, MIN_PLAYERS } from '../game/engine';
 import type { Deck } from '../game/types';
@@ -65,7 +66,7 @@ export function MainMenu({ tab, onTab, onQuickMatch, onRoom, onStory }: Props) {
 
       <main className="menu-body">
         {tab === 'jogar' && <PlayTab onQuickMatch={onQuickMatch} onRoom={onRoom} onLocker={() => onTab('studio')} />}
-        {tab === 'studio' && <Suspense fallback={<p>Carregando estúdio…</p>}><CharacterStudio /></Suspense>}
+        {tab === 'studio' && <Suspense fallback={<p className="hint">Carregando estúdio…</p>}><AvatarStudio onPlay={() => onTab('jogar')} /></Suspense>}
         {tab === 'armario' && <LockerTab />}
         {tab === 'loja' && <ShopTab onStudio={() => onTab('studio')} />}
         {tab === 'decks' && <DecksTab />}
@@ -90,6 +91,8 @@ function PlayTab({ onQuickMatch, onRoom, onLocker }: { onQuickMatch: Props['onQu
   const count = Math.max(MIN_PLAYERS, Math.min(players, maxP));
 
   const me = { id: profile.id, name: profile.name, isBot: false, skin: profile.skin };
+  const config = useMemo(() => resolveConfig(profile.avatar), [profile.avatar]);
+  const [celebrating, setCelebrating] = useState(false);
 
   async function go() {
     audio.sfx('click');
@@ -110,7 +113,12 @@ function PlayTab({ onQuickMatch, onRoom, onLocker }: { onQuickMatch: Props['onQu
     <div className="play">
       <section className="stage">
         <div className="stage-glow" />
-        <div className="lobby-character"><Suspense fallback={<p>Carregando personagem 3D…</p>}><CharacterStage look={profile.avatar} /></Suspense></div>
+        <div className="lobby-character">
+          <Suspense fallback={<p className="hint">Carregando personagem 3D…</p>}>
+            <AvatarView config={config} motion={celebrating ? config.celebration : config.dance} interactive={false} label={`${profile.name} dançando no lobby`} />
+          </Suspense>
+          <button type="button" className="lobby-celebrate" onClick={() => setCelebrating(v => !v)}>{celebrating ? 'Voltar a dançar' : 'Comemorar'}</button>
+        </div>
         <div className="pedestal" />
         <input
           className="name-input"

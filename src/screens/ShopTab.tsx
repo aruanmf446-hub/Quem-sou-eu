@@ -54,7 +54,7 @@ export function ShopTab({ onStudio }: { onStudio: () => void }) {
   const [msg, setMsg] = useState('');
 
   const owned = (e: { kind: ItemKind; id: string }) =>
-    ({ color: p.ownedColors, hat: p.ownedHats, visor: p.ownedVisors, deck: p.ownedDecks, character: p.ownedCharacters, dance: p.ownedDances })[e.kind].includes(e.id);
+    ({ color: p.ownedColors, hat: p.ownedHats, visor: p.ownedVisors, deck: p.ownedDecks, character: p.ownedCharacters, dance: p.ownedDances, item: p.ownedItems ?? [] })[e.kind].includes(e.id);
 
   async function purchase(kind: ItemKind, id: string, name: string) {
     setMsg('');
@@ -95,7 +95,7 @@ export function ShopTab({ onStudio }: { onStudio: () => void }) {
 
   return (
     <div className="shop">
-      <section className="studio-shop-banner"><div><span className="studio-eyebrow">NOVIDADE / PERSONAGENS 3D</span><h2>Seu visual. Seu movimento.</h2><p>Experimente e compre skins e danças no Estúdio 3D.</p></div><button className="studio-equip" onClick={onStudio}>Explorar skins e danças ↗</button></section>
+      <section className="studio-shop-banner"><div><span className="studio-eyebrow">ESTÚDIO 3D</span><h2>Crie seu personagem</h2><p>Rosto, corpo, cabelo, roupas, chuteiras, acessórios, danças e comemorações — tudo com prévia em 3D antes de comprar.</p></div><button className="studio-equip" onClick={onStudio}>Abrir o Estúdio 3D</button></section>
       {msg && <div className="toast">{msg}</div>}
       <div className="shop-head">
         <h2>Destaques do dia</h2>

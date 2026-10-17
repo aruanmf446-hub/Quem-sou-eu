@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { CardView, type CardStatus } from '../components/CardView';
 import { Crewmate } from '../components/Crewmate';
 import { audio } from '../audio/music';
@@ -6,6 +6,14 @@ import { coinsForResult, currentPlayer } from '../game/engine';
 import type { LogEntry, PublicState } from '../game/types';
 import type { MatchController, MatchSnapshot } from '../online/match';
 import { award } from '../lib/economy';
+import { useProfile } from '../lib/profile';
+import { resolveConfig } from '../avatar/ownership';
+const AvatarView = lazy(() => import('../avatar/AvatarView').then(m => ({ default: m.AvatarView })));
+
+/** Retrato 3D do jogador local (gerado ao equipar no Estúdio 3D). */
+function Seat3D({ portrait, size }: { portrait?: string; size: number }) {
+  return portrait ? <img className="seat-portrait" src={portrait} alt="Seu personagem" width={size} height={size} /> : null;
+}
 
 interface Props {
   controller: MatchController;
@@ -33,6 +41,8 @@ function describe(entry: LogEntry, s: PublicState, myId: string): string | null 
 }
 
 export function MatchScreen({ controller, online, onExit }: Props) {
+  const profile = useProfile();
+  const myConfig = useMemo(() => resolveConfig(profile.avatar), [profile.avatar]);
   const [snap, setSnap] = useState<MatchSnapshot | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -145,7 +155,7 @@ export function MatchScreen({ controller, online, onExit }: Props) {
       <div className="players-strip">
         {s.players.map((p) => (
           <div key={p.id} className={`seat ${p.id === turn.id && s.phase === 'playing' ? 'turn' : ''} ${p.eliminated ? 'out' : ''} ${p.id === snap.myId ? 'me' : ''}`}>
-            <Crewmate skin={p.skin} size={40} dead={p.eliminated} />
+            {p.id === snap.myId && profile.avatarPortrait ? <Seat3D portrait={profile.avatarPortrait} size={40} /> : <Crewmate skin={p.skin} size={40} dead={p.eliminated} />}
             <span className="seat-name">{p.id === snap.myId ? 'Você' : p.name}</span>
             <span className="lives">{p.eliminated ? '—' : '🂠'.repeat(p.handCount)}</span>
           </div>
@@ -256,11 +266,12 @@ export function MatchScreen({ controller, online, onExit }: Props) {
         <div className="overlay">
           <div className="modal results">
             <h2>{s.winnerId === snap.myId ? '🏆 VITÓRIA!' : `${nameOf(s.winnerId ?? '')} venceu!`}</h2>
+            {s.winnerId === snap.myId && !spectator && <div className="victory-avatar"><Suspense fallback={null}><AvatarView config={myConfig} motion={myConfig.celebration} interactive={false} label="Seu personagem comemorando a vitória" /></Suspense></div>}
             <ol className="ranking">
               {ranking.map((p, i) => (
                 <li key={p.id} className={p.id === snap.myId ? 'me' : ''}>
                   <span>#{i + 1}</span>
-                  <Crewmate skin={p.skin} size={30} dead={p.eliminated} />
+                  {p.id === snap.myId && profile.avatarPortrait ? <Seat3D portrait={profile.avatarPortrait} size={30} /> : <Crewmate skin={p.skin} size={30} dead={p.eliminated} />}
                   <span className="r-name">{p.id === snap.myId ? 'Você' : p.name}</span>
                   <span>{p.handCount} 🂠</span>
                 </li>

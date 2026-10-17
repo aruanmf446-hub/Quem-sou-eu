@@ -1,4 +1,5 @@
 import { CHARACTERS, DANCES } from '../data/characters';
+import { ITEMS } from '../avatar/catalog';
 import { HATS, SKIN_COLORS, VISORS } from '../data/skins';
 import { OFFICIAL_DECKS } from '../data/decks';
 import { getProfile, setProfile } from './profile';
@@ -6,14 +7,14 @@ import { awardCoinsRemote, isOnlineAvailable, purchaseRemote, type ItemKind } fr
 import { audio } from '../audio/music';
 
 export function priceOf(kind: ItemKind, id: string): number {
-  const list = kind === 'character' ? CHARACTERS : kind === 'dance' ? DANCES : kind === 'color' ? SKIN_COLORS : kind === 'hat' ? HATS : kind === 'visor' ? VISORS : OFFICIAL_DECKS;
+  const list = kind === 'item' ? ITEMS : kind === 'character' ? CHARACTERS : kind === 'dance' ? DANCES : kind === 'color' ? SKIN_COLORS : kind === 'hat' ? HATS : kind === 'visor' ? VISORS : OFFICIAL_DECKS;
   return list.find((i) => i.id === id)?.price ?? Infinity;
 }
 
-const OWN_FIELD = { color: 'ownedColors', hat: 'ownedHats', visor: 'ownedVisors', deck: 'ownedDecks', character: 'ownedCharacters', dance: 'ownedDances' } as const;
+const OWN_FIELD = { color: 'ownedColors', hat: 'ownedHats', visor: 'ownedVisors', deck: 'ownedDecks', character: 'ownedCharacters', dance: 'ownedDances', item: 'ownedItems' } as const;
 
 export function owns(kind: ItemKind, id: string) {
-  return getProfile()[OWN_FIELD[kind]].includes(id);
+  return (getProfile()[OWN_FIELD[kind]] ?? []).includes(id);
 }
 
 let purchaseQueue: Promise<void> = Promise.resolve();
@@ -36,7 +37,7 @@ async function purchase(kind: ItemKind, id: string): Promise<void> {
     coins = remote;
   }
   const field = OWN_FIELD[kind];
-  setProfile((cur) => ({ coins, [field]: [...cur[field], id] }));
+  setProfile((cur) => ({ coins, [field]: [...(cur[field] ?? []), id] }));
   audio.sfx('coin');
 }
 

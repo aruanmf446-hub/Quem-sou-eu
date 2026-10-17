@@ -51,7 +51,9 @@ async function doInit(): Promise<string | null> {
       story: row.story ?? local.story,
       ownedCharacters: row.owned_characters ?? ['street'],
       ownedDances: row.owned_dances ?? ['groove'],
+      ownedItems: row.owned_items ?? local.ownedItems ?? [],
       avatar: row.avatar ?? local.avatar,
+      outfits: Array.isArray(row.outfits) ? row.outfits : local.outfits ?? [],
     });
   } else {
     await supabase.from('profiles').insert({ id: user.id, username: local.name, skin: local.skin, story: local.story });
@@ -65,7 +67,13 @@ async function doInit(): Promise<string | null> {
   onProfileChange((p: Profile) => {
     window.clearTimeout(timer);
     timer = window.setTimeout(() => {
-      void supabase!.from('profiles').update({ username: p.name, skin: p.skin, story: p.story, avatar: p.avatar }).eq('id', user!.id);
+      void supabase!.from('profiles').update({ username: p.name, skin: p.skin, story: p.story, avatar: p.avatar }).eq('id', user!.id).then(({ error }) => {
+        if (error) console.warn('Não foi possível sincronizar o avatar', error.message);
+      });
+      // Coluna da migração do estúdio 3D; falha isolada não impede o resto da sincronização.
+      void supabase!.from('profiles').update({ outfits: p.outfits }).eq('id', user!.id).then(({ error }) => {
+        if (error) console.warn('Visuais salvos ficam só neste aparelho até a migração ser aplicada', error.message);
+      });
     }, 800);
   });
   return user.id;
@@ -98,7 +106,7 @@ export async function listCommunityDecks(): Promise<Deck[]> {
   return (data ?? []).map(rowToDeck);
 }
 
-export type ItemKind = 'color' | 'hat' | 'visor' | 'deck' | 'character' | 'dance';
+export type ItemKind = 'color' | 'hat' | 'visor' | 'deck' | 'character' | 'dance' | 'item';
 
 /** Compra no servidor (o preço vem da tabela shop_items, não do cliente). */
 export async function purchaseRemote(kind: ItemKind, itemId: string): Promise<number | null> {
