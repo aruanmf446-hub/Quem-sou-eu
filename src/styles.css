@@ -1266,3 +1266,4 @@ input[type='range'] {
 .ranking .seat-portrait { width:30px; height:30px; border-radius:9px; }
 .victory-avatar { position:relative; height:min(42vh,340px); margin:-6px auto 6px; width:min(100%,320px); }
 .victory-avatar .avatar-view { position:absolute; inset:0; }
+.room-portrait { width:64px; height:64px; border-radius:18px; }

@@ -1,11 +1,12 @@
-import { lazy, Suspense, useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useRef, useState } from 'react';
+import type { AvatarViewHandle } from '../avatar/AvatarView';
 const AvatarView = lazy(() => import('../avatar/AvatarView').then(m => ({ default: m.AvatarView })));
 const AvatarStudio = lazy(() => import('./AvatarStudio').then(m => ({ default: m.AvatarStudio })));
 import { resolveConfig } from '../avatar/ownership';
 import { audio } from '../audio/music';
 import { maxPlayersForDeck, MIN_PLAYERS } from '../game/engine';
 import type { Deck } from '../game/types';
-import { playableDecks, setProfile, useProfile } from '../lib/profile';
+import { getProfile, playableDecks, setProfile, useProfile } from '../lib/profile';
 import { isOnlineAvailable } from '../lib/supabase';
 import { Room } from '../online/room';
 import { LockerTab } from './LockerTab';
@@ -93,6 +94,14 @@ function PlayTab({ onQuickMatch, onRoom, onLocker }: { onQuickMatch: Props['onQu
   const me = { id: profile.id, name: profile.name, isBot: false, skin: profile.skin };
   const config = useMemo(() => resolveConfig(profile.avatar), [profile.avatar]);
   const [celebrating, setCelebrating] = useState(false);
+  const view = useRef<AvatarViewHandle | null>(null);
+  // Perfis antigos ganham o retrato 3D usado na partida assim que o avatar termina de carregar.
+  function capturePortrait() {
+    if (getProfile().avatarPortrait) return;
+    window.setTimeout(() => {
+      try { const portrait = view.current?.snapshot(320, 400); if (portrait) setProfile({ avatarPortrait: portrait }); } catch { /* sem retrato */ }
+    }, 600);
+  }
 
   async function go() {
     audio.sfx('click');
@@ -115,7 +124,8 @@ function PlayTab({ onQuickMatch, onRoom, onLocker }: { onQuickMatch: Props['onQu
         <div className="stage-glow" />
         <div className="lobby-character">
           <Suspense fallback={<p className="hint">Carregando personagem 3D…</p>}>
-            <AvatarView config={config} motion={celebrating ? config.celebration : config.dance} interactive={false} label={`${profile.name} dançando no lobby`} />
+            <AvatarView config={config} motion={celebrating ? config.celebration : config.dance} interactive={false} label={`${profile.name} dançando no lobby`}
+              onReady={h => { view.current = h; }} onLoading={pending => { if (!pending.length) capturePortrait(); }} />
           </Suspense>
           <button type="button" className="lobby-celebrate" onClick={() => setCelebrating(v => !v)}>{celebrating ? 'Voltar a dançar' : 'Comemorar'}</button>
         </div>

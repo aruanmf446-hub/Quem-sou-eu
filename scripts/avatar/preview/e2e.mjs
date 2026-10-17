@@ -87,7 +87,7 @@ for (const [name, viewport, mobile] of [['desktop', { width: 1440, height: 900 }
   check(true, 'avatar dança no lobby');
   await page.getByRole('button', { name: 'Comemorar' }).click();
   await page.waitForTimeout(1500);
-  await page.getByRole('button', { name: 'JOGAR' }).click();
+  await page.locator('.play-btn').click();
   await page.waitForSelector('.seat-portrait', { timeout: 30000 });
   await page.screenshot({ path: `${out}-${name}-partida.png` });
   check(true, 'retrato 3D do jogador aparece na partida');

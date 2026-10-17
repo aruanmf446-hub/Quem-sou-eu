@@ -95,6 +95,8 @@ class ItemBuilder:
                 morphs[k] = np.broadcast_to(d.mean(0), d.shape).copy()
         else:
             morphs = m.bound_morphs(ids, bary)
+        # Morphs que mexem menos de meio milímetro na peça não valem o peso no arquivo.
+        morphs = {k: v for k, v in morphs.items() if np.abs(v).max() > 5e-4}
         if nrm is None:
             nrm = vertex_normals(pos, tris)
         self._emit(name, pos, nrm, uv, tris, material, W, morphs, extra_attrs)

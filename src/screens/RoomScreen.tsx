@@ -53,7 +53,7 @@ export function RoomScreen({ room, onMatch, onExit }: Props) {
           <div className="room-players">
             {lobby.members.map((m) => (
               <div key={m.id} className="room-player">
-                <Crewmate skin={m.skin} size={64} className="float" />
+                {m.id === profile.id && profile.avatarPortrait ? <img className="seat-portrait room-portrait float" src={profile.avatarPortrait} alt="Seu personagem" width={64} height={64} /> : <Crewmate skin={m.skin} size={64} className="float" />}
                 <span>
                   {m.name}
                   {m.isHost ? ' 👑' : ''}

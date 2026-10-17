@@ -216,3 +216,7 @@
 @media (max-width: 380px) {
   .as-player-motions { display: none; }
 }
+
+/* Foco visível para teclado */
+.as-root button:focus-visible, .as-root input:focus-visible, .as-root select:focus-visible, .as-swatch-custom:focus-within { outline: 2px solid #fff; outline-offset: 2px; }
+.as-tabs button:focus-visible, .as-item:focus-visible, .as-move:focus-visible, .as-bundle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

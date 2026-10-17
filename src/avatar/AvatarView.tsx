@@ -67,7 +67,7 @@ export function AvatarView({ config, motion = 'groove', playing = true, speed = 
       applyConfig(props.current.config, true);
       avatar.play(props.current.motion ?? 'idle', 0);
       setStatus('ready');
-      onReady?.({ stage, avatar, snapshot: (w = 512, h = 640) => snapshot(stage, w, h) });
+      onReady?.({ stage, avatar, snapshot: (w = 512, h = 640) => snapshot(stage, w, h, avatar) });
       if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__avatarStage = stage;
     }).catch(() => !disposed && setStatus('error'));
     const lookTarget = new THREE.Vector3(), trackPoint = new THREE.Vector3();
@@ -140,11 +140,14 @@ export function AvatarView({ config, motion = 'groove', playing = true, speed = 
   useEffect(() => { if (motion) ctx.current?.avatar?.play(motion); }, [motion, status]);
   useEffect(() => { ctx.current?.stage.setMood(mood); }, [mood, status]);
   useEffect(() => { const s = ctx.current?.stage; if (s) s.controls.autoRotate = autoRotate && !reduced(); }, [autoRotate, status]);
+  const shown = useRef(false);
   useEffect(() => {
     const s = ctx.current?.stage, a = ctx.current?.avatar;
     if (!s) return;
     if (a) s.height = Math.max(1.4, a.headHeight());
-    s.focus(focus, status !== 'ready');
+    // Na primeira exibição a câmera já nasce enquadrada; depois, transições suaves.
+    s.focus(focus, status !== 'ready' || !shown.current);
+    if (status === 'ready') shown.current = true;
   }, [focus, focusKey, status]);
 
   return <div className={`avatar-view ${status === 'ready' ? 'is-ready' : ''} ${className ?? ''}`} ref={host}>
@@ -153,22 +156,29 @@ export function AvatarView({ config, motion = 'groove', playing = true, speed = 
   </div>;
 }
 
-function snapshot(stage: AvatarStage, w: number, h: number) {
-  // Renderiza direto no canvas (mesma tonalização da tela) e lê na mesma tarefa.
+function snapshot(stage: AvatarStage, w: number, h: number, avatar?: Avatar) {
+  // Retrato de busto renderizado direto no canvas (mesma tonalização da tela), lido na mesma tarefa.
   const { renderer, scene, camera } = stage;
   const size = renderer.getSize(new THREE.Vector2());
   const ratio = renderer.getPixelRatio();
-  const aspect = camera.aspect;
+  const cam = new THREE.PerspectiveCamera(24, w / h, .05, 30);
+  const head = avatar?.bones.get('Head');
+  if (head) {
+    avatar!.root.updateMatrixWorld(true);
+    const target = head.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, .02, 0));
+    cam.position.copy(target).add(new THREE.Vector3(.28, .04, 1.25));
+    cam.lookAt(target.x, target.y - .08, target.z);
+  } else {
+    cam.copy(camera);
+    cam.aspect = w / h;
+  }
+  cam.updateProjectionMatrix();
   renderer.setPixelRatio(1);
   renderer.setSize(w, h, false);
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
-  renderer.render(scene, camera);
+  renderer.render(scene, cam);
   const url = renderer.domElement.toDataURL('image/webp', .86);
   renderer.setPixelRatio(ratio);
   renderer.setSize(size.x, size.y, false);
-  camera.aspect = aspect;
-  camera.updateProjectionMatrix();
   renderer.render(scene, camera);
   return url;
 }
