@@ -21,6 +21,8 @@ function job(item) {
   if (HEAD.has(item.slot) || item.id.startsWith('facepaint')) { p.set('keepHead', '1'); p.set('az', '.45'); p.set('pad', '1.05'); }
   if (item.slot === 'bodyart' && item.id.startsWith('tattoo')) { p.set('keepBody', '1'); p.set('fit', 'item'); p.set('az', '-.9'); p.set('pad', '1.25'); }
   if (item.slot === 'shoes' || item.slot === 'socks') { p.set('az', '.85'); p.set('el', '.3'); }
+  if (item.slot === 'back') { p.set('az', '2.6'); }
+  if (item.slot === 'prop' || item.slot === 'hands') { p.set('az', '.4'); p.set('pad', '1.1'); }
   if (item.slot === 'brows') { p.set('az', '.15'); }
   return { name: item.id, query: p.toString(), w: 320, h: 320 };
 }

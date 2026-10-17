@@ -308,6 +308,23 @@ def hair_clown(model, layout):
     return b.save({'tips': True})
 
 
+import hair_styles
+
+
+@item('hair_wild_ponytail', 'hair')
+def _wild(model, layout):
+    return hair_styles.wild_ponytail(model, layout)
+
+
+import collection_mechanic
+import collection_astro
+import collection_harlequin
+import collection_anubis
+import collection_volt
+for _module in (collection_mechanic, collection_astro, collection_harlequin, collection_anubis, collection_volt):
+    _module.register(item)
+
+
 def main(ids):
     t = time.time()
     model = AvatarModel()

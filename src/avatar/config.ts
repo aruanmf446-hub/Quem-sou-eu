@@ -38,7 +38,7 @@ export interface FaceConfig {
 }
 
 /** Slots do guarda-roupa. Cada item ocupa exatamente um slot. */
-export const SLOTS = ['hair', 'brows', 'beard', 'top', 'bottom', 'socks', 'shoes', 'headwear', 'eyewear', 'neck', 'wrist', 'bodyart'] as const;
+export const SLOTS = ['hair', 'brows', 'beard', 'top', 'bottom', 'socks', 'shoes', 'headwear', 'eyewear', 'neck', 'wrist', 'bodyart', 'hands', 'back', 'belt', 'prop'] as const;
 export type Slot = typeof SLOTS[number];
 
 export interface AvatarConfig {

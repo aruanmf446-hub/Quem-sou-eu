@@ -1,0 +1,6 @@
+"""Coleção estilizada: volt. Registra as peças no REGISTRY de build_items."""
+from __future__ import annotations
+
+
+def register(item):
+    pass

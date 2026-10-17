@@ -4,10 +4,25 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { morphInfluences, type AvatarConfig } from './config';
 import { applyHairTips, makeSkinMaterial, skinToneColors, type SkinUniforms } from './materials';
-import { compile, RestSkeleton, sampleFace, type CompiledClip } from './animation';
+import { compile, PoseSolver, RestSkeleton, sampleFace, type CompiledClip } from './animation';
 import { CHOREOGRAPHIES } from './dances';
 
 let restSkeleton: RestSkeleton | null = null;
+const grips = new Map<string, Map<string, THREE.Quaternion>>();
+/** Rotações dos dedos para segurar um objeto (calculadas uma vez no esqueleto-padrão). */
+function gripPose(kind: 'fist' | 'staff' | 'open', side: 'Right' | 'Left', base: GLTF) {
+  const key = `${kind}:${side}`;
+  let g = grips.get(key);
+  if (!g) {
+    restSkeleton ??= new RestSkeleton(base.scene);
+    const solver = new PoseSolver(restSkeleton);
+    const arm = { raise: 8, forward: 0, elbow: 12, hand: kind === 'open' ? 'open' as const : 'fist' as const, fist: kind === 'staff' ? .85 : 1 };
+    solver.solve(side === 'Right' ? { armR: arm } : { armL: arm });
+    g = new Map([...solver.out].filter(([n]) => n.startsWith(`${side}Hand`) && n !== `${side}Hand`));
+    grips.set(key, g);
+  }
+  return g;
+}
 const compiled = new Map<string, CompiledClip>();
 /** Clip compartilhado por todos os avatares (compilado uma vez no esqueleto-padrão). */
 export function getClip(id: string, base: GLTF): CompiledClip | null {
@@ -38,15 +53,16 @@ export function loadAvatarAsset(url: string, onProgress?: (ratio: number) => voi
 }
 
 interface BaseExtras { morphs: string[]; jointDeltas: Record<string, Record<string, [number, number, number]>>; regions: Record<string, string[]>; bones: string[]; }
-export interface ItemExtras { slot: string; hides?: string[]; tintable?: string[]; lift?: number; }
+export interface ItemExtras { slot: string; hides?: string[]; tintable?: string[]; lift?: number; grip?: 'fist' | 'staff' | 'open'; hand?: 'Right' | 'Left'; }
 
 interface Part { mesh: THREE.Mesh; item?: string; }
-interface EquippedItem { id: string; slot: string; meshes: THREE.Mesh[]; hides: string[]; lift: number; }
+interface EquippedItem { id: string; slot: string; meshes: THREE.Mesh[]; hides: string[]; lift: number; grip?: ItemExtras['grip']; hand?: 'Right' | 'Left'; }
 
 const EXPRESSIONS = ['expr_blink_l', 'expr_blink_r', 'expr_smile', 'expr_squint', 'expr_brows_up', 'expr_brows_down', 'expr_mouth_open', 'expr_pucker', 'expr_grin'] as const;
 export type Expression = typeof EXPRESSIONS[number];
 
 const tmpMatrix = new THREE.Matrix4();
+const LASH_DARK = new THREE.Color('#0d0907');
 const tmpInverseRoot = new THREE.Matrix4();
 
 /**
@@ -72,6 +88,7 @@ export class Avatar {
   private influences: Record<string, number> = {};
   private skinUniforms: SkinUniforms;
   private irisMaterials: THREE.MeshStandardMaterial[] = [];
+  private skinMaterials: THREE.MeshPhysicalMaterial[] = [];
   private hairColor = new THREE.Color('#2a1c14');
   private hairTips = { value: new THREE.Color('#e8c27a') };
   private hairTipAmount = { value: 0 };
@@ -111,11 +128,25 @@ export class Avatar {
         const material = mesh.material as THREE.MeshStandardMaterial;
         if (material.userData.skin) {
           let skin = skinMaterials.get(material);
-          if (!skin) { skin = makeSkinMaterial(material, this.skinUniforms); skinMaterials.set(material, skin); }
+          if (!skin) { skin = makeSkinMaterial(material, this.skinUniforms); skinMaterials.set(material, skin); this.skinMaterials.push(skin as THREE.MeshPhysicalMaterial); }
           mesh.material = skin;
         } else if (material.userData.irisColor) {
-          mesh.material = material.clone();
-          this.irisMaterials.push(mesh.material as THREE.MeshStandardMaterial);
+          const iris = material.clone();
+          if (material.userData.catchlight) {
+            // Reflexo branco desenhado na textura (valores acima de 0,9) não recebe a cor da íris.
+            iris.onBeforeCompile = shader => {
+              shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', `
+#ifdef USE_MAP
+  vec4 irisTexel = texture2D( map, vMapUv );
+  float glint = smoothstep( 0.88, 0.97, irisTexel.r );
+  diffuseColor.rgb = mix( diffuseColor.rgb * irisTexel.rgb, vec3( 1.0 ), glint );
+  totalEmissiveRadiance += glint * 0.6;
+#endif`).replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>');
+            };
+            iris.customProgramCacheKey = () => 'avatar-iris-glint';
+          }
+          mesh.material = iris;
+          this.irisMaterials.push(iris as THREE.MeshStandardMaterial);
         } else if (material.userData.cornea) {
           const cornea = new THREE.MeshPhysicalMaterial({ transparent: true, opacity: .08, roughness: 0, metalness: 0, clearcoat: 1, clearcoatRoughness: 0, depthWrite: false, envMapIntensity: 1.6 });
           mesh.material = cornea;
@@ -125,7 +156,7 @@ export class Avatar {
           mesh.material = material.clone();
           (mesh.material as THREE.MeshStandardMaterial).depthWrite = false;
           mesh.castShadow = false;
-          this.addTint('hair:brows', mesh.material as THREE.MeshStandardMaterial);
+          this.addTint('lashes', mesh.material as THREE.MeshStandardMaterial);
         }
         this.parts.push({ mesh });
         const region = mesh.userData.region as string | undefined;
@@ -205,6 +236,12 @@ export class Avatar {
     this.influences = morphInfluences(config);
     this.feminine = config.body.type;
     this.toon = (config.body.style ?? 0) >= .45;
+    // Estilo animação: pele mais lisa (menos poros) e bochechas levemente coradas.
+    const smooth = 1 - .8 * Math.min(1, Math.max(0, config.body.style ?? 0));
+    for (const m of this.skinMaterials) {
+      const base = (m.userData.baseNormalScale as THREE.Vector2 | undefined) ?? (m.userData.baseNormalScale = m.normalScale.clone());
+      m.normalScale.copy(base).multiplyScalar(smooth);
+    }
     this.recomputeBind();
     this.applyMorphs();
     this.updateVisibility();
@@ -231,7 +268,7 @@ export class Avatar {
     this.hairTipAmount.value = config.hairTips ? 1 : 0;
     if (config.hairTips) this.hairTips.value.set(config.hairTips);
     for (const [key, materials] of this.tintTargets) {
-      if (key === 'hair:brows') { for (const m of materials) m.color.copy(this.hairColor).multiplyScalar(.85); continue; }
+      if (key === 'lashes') { for (const m of materials) m.color.copy(this.hairColor).lerp(LASH_DARK, .8); continue; }
       if (key.startsWith('hair:')) { for (const m of materials) m.color.copy(this.hairColor); continue; }
       const [item, part] = key.split(':');
       const tint = config.tints[`${item}:${part}`];
@@ -275,7 +312,7 @@ export class Avatar {
       this.model.add(mesh);
       this.parts.push({ mesh, item: id });
     }
-    this.equipped.set(slot, { id, slot, meshes, hides: extras.hides ?? [], lift: extras.lift ?? 0 });
+    this.equipped.set(slot, { id, slot, meshes, hides: extras.hides ?? [], lift: extras.lift ?? 0, grip: extras.grip, hand: extras.hand });
     this.applyMorphs();
     this.updateVisibility();
   }
@@ -305,9 +342,14 @@ export class Avatar {
     const hidden = new Set<string>();
     for (const item of this.equipped.values()) item.hides.forEach(r => hidden.add(r));
     for (const [region, meshes] of this.regions) for (const m of meshes) m.visible = !hidden.has(region);
+    // Máscaras que cobrem a cabeça inteira escondem também olhos, boca, cabelo e pelos.
+    const headHidden = hidden.has('head');
+    const faceSlots = new Set(['hair', 'brows', 'beard', 'eyewear']);
+    for (const item of this.equipped.values()) if (faceSlots.has(item.slot)) item.meshes.forEach(m => { m.visible = !headHidden; });
     // Roupa íntima neutra da base: aparece só quando a peça correspondente não está vestida.
     for (const { mesh } of this.parts) {
-      if (mesh.userData.eyeSet) mesh.visible = (mesh.userData.eyeSet === 'toon') === this.toon;
+      if (mesh.userData.eyeSet) mesh.visible = (mesh.userData.eyeSet === 'toon') === this.toon && !headHidden;
+      if (/^(lashes|teeth|tongue)/.test(String(mesh.userData.layer ?? ''))) mesh.visible = !headHidden;
       if (mesh.userData.layer === 'underwear_bottom') mesh.visible = !this.equipped.has('bottom');
       if (mesh.userData.layer === 'underwear_top') mesh.visible = !this.equipped.has('top') && this.feminine > .3;
     }
@@ -351,6 +393,11 @@ export class Avatar {
     this.mixer.update(dt);
     const hips = this.bones.get('Hips');
     if (hips) hips.position.copy(this.hipsBase).add(this.motion.position);
+    // Objeto na mão: os dedos seguram o cabo durante qualquer dança.
+    for (const item of this.equipped.values()) {
+      if (!item.grip) continue;
+      for (const [name, q] of gripPose(item.grip, item.hand ?? 'Right', this.base)) this.bones.get(name)?.quaternion.copy(q);
+    }
     this.blinkTimer -= dt;
     if (this.blinkTimer <= 0 && this.blinkPhase < 0) { this.blinkPhase = 0; this.blinkTimer = 2 + Math.random() * 3.5; }
     let blink = 0;

@@ -96,10 +96,13 @@ TARGET_MORPHS = {
     'ears_small': both('ears/{s}-ear-scale-decr'),
     'ears_pointed': both('ears/{s}-ear-shape-pointed'),
     # Estilo de animação: cabeça e olhos maiores, nariz e boca menores, pescoço fino.
-    'style_toon': [('head/head-scale-vert-incr', .9), ('head/head-scale-horiz-incr', .9), ('head/head-scale-depth-incr', .8),
-                   ('eyes/l-eye-scale-incr', 1.6), ('eyes/r-eye-scale-incr', 1.6), ('eyes/l-eye-height2-incr', .8), ('eyes/r-eye-height2-incr', .8),
-                   ('nose/nose-scale-horiz-decr', .5), ('nose/nose-scale-vert-decr', .5), ('nose/nose-scale-depth-decr', .4),
-                   ('mouth/mouth-scale-horiz-decr', .25), ('chin/chin-height-decr', .3), ('neck/measure-neck-circ-decr', .5),
+    'style_toon': [('head/head-scale-vert-incr', .9), ('head/head-scale-horiz-incr', 1.0), ('head/head-scale-depth-incr', .8),
+                   ('eyes/l-eye-scale-incr', 2.0), ('eyes/r-eye-scale-incr', 2.0), ('eyes/l-eye-height2-incr', .3), ('eyes/r-eye-height2-incr', .3),
+                   ('nose/nose-scale-horiz-decr', .7), ('nose/nose-scale-vert-decr', .7), ('nose/nose-scale-depth-decr', .6), ('nose/nose-point-up', .5),
+                   ('mouth/mouth-scale-horiz-decr', .35), ('mouth/mouth-scale-vert-decr', .3), ('mouth/mouth-upperlip-volume-decr', .3),
+                   ('chin/chin-height-decr', .5), ('chin/chin-width-decr', .4), ('chin/chin-prominent-decr', .3),
+                   ('cheek/l-cheek-volume-incr', .45), ('cheek/r-cheek-volume-incr', .45), ('head/head-oval', .35), ('cheek/l-cheek-bones-decr', .4), ('cheek/r-cheek-bones-decr', .4),
+                   ('forehead/forehead-scale-vert-incr', .4), ('neck/measure-neck-circ-decr', .5),
                    ('hands/l-hand-scale-incr', .5), ('hands/r-hand-scale-incr', .5)],
 }
 

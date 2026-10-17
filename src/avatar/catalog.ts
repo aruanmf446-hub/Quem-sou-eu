@@ -9,7 +9,7 @@ export interface CatalogItem {
   price: number;
   rarity: Rarity;
   /** Pacote (personagem legado) que libera o item ao ser adquirido. */
-  bundle?: 'street' | 'striker' | 'night-clown';
+  bundle?: BundleId;
   /** Partes recoloríveis e cor padrão. */
   tints?: Record<string, string>;
   /** Cor de cabelo sugerida ao escolher este estilo. */
@@ -20,6 +20,7 @@ export interface CatalogItem {
 export const SLOT_LABELS: Record<Slot, string> = {
   hair: 'Cabelo', brows: 'Sobrancelhas', beard: 'Barba', top: 'Parte de cima', bottom: 'Parte de baixo',
   socks: 'Meias', shoes: 'Calçados', headwear: 'Cabeça', eyewear: 'Óculos', neck: 'Pescoço', wrist: 'Pulso', bodyart: 'Arte corporal',
+  hands: 'Luvas', back: 'Capa e costas', belt: 'Cintos e bolsas', prop: 'Na mão',
 };
 
 /** Slots que nunca ficam vazios (o corpo sempre aparece vestido). */
@@ -73,6 +74,52 @@ export const ITEMS: CatalogItem[] = [
   { id: 'watch', slot: 'wrist', name: 'Relógio esportivo', price: 80, rarity: 'raro' },
   { id: 'tattoo_sleeve', slot: 'bodyart', name: 'Tatuagem geométrica', price: 100, rarity: 'épico', bundle: 'striker' },
   { id: 'facepaint_midnight', slot: 'bodyart', name: 'Pintura da meia-noite', price: 80, rarity: 'raro', bundle: 'night-clown' },
+  // Coleção Mecânica dos Céus
+  { id: 'hair_wild_ponytail', slot: 'hair', name: 'Rabo de cavalo rebelde', price: 120, rarity: 'épico', bundle: 'sky-mechanic', suggestHair: '#a8401f' },
+  { id: 'goggles_brass', slot: 'headwear', name: 'Óculos de aviador', price: 90, rarity: 'épico', bundle: 'sky-mechanic' },
+  { id: 'top_aviator_jacket', slot: 'top', name: 'Jaqueta de aviadora', price: 150, rarity: 'épico', bundle: 'sky-mechanic' },
+  { id: 'bottom_cargo_navy', slot: 'bottom', name: 'Calça cargo de oficina', price: 110, rarity: 'raro', bundle: 'sky-mechanic' },
+  { id: 'shoes_lace_boots', slot: 'shoes', name: 'Botas de cano alto com engrenagens', price: 130, rarity: 'épico', bundle: 'sky-mechanic' },
+  { id: 'gloves_fingerless', slot: 'hands', name: 'Luvas sem dedos', price: 50, rarity: 'raro', bundle: 'sky-mechanic' },
+  { id: 'belt_tool_harness', slot: 'belt', name: 'Cinturão de ferramentas', price: 120, rarity: 'épico', bundle: 'sky-mechanic' },
+  { id: 'scarf_wind', slot: 'back', name: 'Lenço ao vento', price: 90, rarity: 'raro', bundle: 'sky-mechanic', tints: { main: '#e8735a' } },
+  { id: 'prop_wrench', slot: 'prop', name: 'Chave inglesa', price: 80, rarity: 'raro', bundle: 'sky-mechanic' },
+  // Coleção Astrônoma
+  { id: 'hair_wavy_long', slot: 'hair', name: 'Ondas longas', price: 120, rarity: 'épico', bundle: 'astronomer', suggestHair: '#1f2a5c' },
+  { id: 'circlet_gear', slot: 'headwear', name: 'Tiara de engrenagem', price: 70, rarity: 'raro', bundle: 'astronomer' },
+  { id: 'top_star_tunic', slot: 'top', name: 'Túnica estelar', price: 150, rarity: 'épico', bundle: 'astronomer' },
+  { id: 'back_star_capelet', slot: 'back', name: 'Capa das constelações', price: 140, rarity: 'épico', bundle: 'astronomer' },
+  { id: 'bottom_star_pants', slot: 'bottom', name: 'Calça bufante estrelada', price: 110, rarity: 'raro', bundle: 'astronomer' },
+  { id: 'shoes_gold_boots', slot: 'shoes', name: 'Botas de bordas douradas', price: 120, rarity: 'épico', bundle: 'astronomer' },
+  { id: 'belt_compass', slot: 'belt', name: 'Cinto da bússola', price: 90, rarity: 'raro', bundle: 'astronomer' },
+  { id: 'bracers_leather', slot: 'wrist', name: 'Braçadeiras de couro', price: 60, rarity: 'raro', bundle: 'astronomer' },
+  { id: 'prop_orrery_staff', slot: 'prop', name: 'Cajado orrery', price: 150, rarity: 'lendário', bundle: 'astronomer' },
+  // Coleção Arlequina
+  { id: 'hair_curly_pigtails', slot: 'hair', name: 'Maria-chiquinha cacheada', price: 130, rarity: 'épico', bundle: 'harlequin', suggestHair: '#e0367d' },
+  { id: 'hat_jester', slot: 'headwear', name: 'Chapéu de guizos', price: 120, rarity: 'épico', bundle: 'harlequin' },
+  { id: 'top_harlequin', slot: 'top', name: 'Blusa losango com gola franzida', price: 150, rarity: 'épico', bundle: 'harlequin' },
+  { id: 'bottom_puff_shorts', slot: 'bottom', name: 'Short bufante losango', price: 100, rarity: 'raro', bundle: 'harlequin' },
+  { id: 'socks_harlequin', slot: 'socks', name: 'Meias 7/8 desencontradas', price: 70, rarity: 'raro', bundle: 'harlequin' },
+  { id: 'shoes_jester', slot: 'shoes', name: 'Botinhas de bico enrolado', price: 120, rarity: 'épico', bundle: 'harlequin' },
+  { id: 'gloves_ruffle', slot: 'hands', name: 'Luvas com babado', price: 60, rarity: 'raro', bundle: 'harlequin' },
+  { id: 'prop_bomb', slot: 'prop', name: 'Bomba sorridente', price: 90, rarity: 'épico', bundle: 'harlequin' },
+  { id: 'facepaint_diamond', slot: 'bodyart', name: 'Losango no rosto', price: 40, rarity: 'comum', bundle: 'harlequin' },
+  // Coleção Guardião Anúbis
+  { id: 'mask_anubis', slot: 'headwear', name: 'Máscara de Anúbis', price: 220, rarity: 'lendário', bundle: 'anubis' },
+  { id: 'neck_usekh', slot: 'neck', name: 'Colar real dourado', price: 120, rarity: 'épico', bundle: 'anubis' },
+  { id: 'top_anubis_harness', slot: 'top', name: 'Faixas do guardião', price: 120, rarity: 'épico', bundle: 'anubis' },
+  { id: 'bottom_shendyt', slot: 'bottom', name: 'Saiote cerimonial', price: 130, rarity: 'épico', bundle: 'anubis' },
+  { id: 'back_cape_night', slot: 'back', name: 'Manto noturno', price: 120, rarity: 'raro', bundle: 'anubis', tints: { main: '#24264a' } },
+  { id: 'bracers_gold', slot: 'wrist', name: 'Braceletes de ouro', price: 90, rarity: 'épico', bundle: 'anubis' },
+  { id: 'shoes_gold_greaves', slot: 'shoes', name: 'Grevas douradas', price: 130, rarity: 'épico', bundle: 'anubis' },
+  { id: 'prop_sun_staff', slot: 'prop', name: 'Cetro solar', price: 150, rarity: 'lendário', bundle: 'anubis' },
+  // Coleção Cientista Voltaico
+  { id: 'hair_spiky', slot: 'hair', name: 'Espetado elétrico', price: 120, rarity: 'épico', bundle: 'volt', suggestHair: '#2f7ad8' },
+  { id: 'top_lab_coat', slot: 'top', name: 'Jaleco de bordas douradas', price: 170, rarity: 'lendário', bundle: 'volt' },
+  { id: 'bottom_cargo_dark', slot: 'bottom', name: 'Calça de laboratório', price: 100, rarity: 'raro', bundle: 'volt' },
+  { id: 'shoes_buckle_boots', slot: 'shoes', name: 'Botas de fivela', price: 120, rarity: 'épico', bundle: 'volt' },
+  { id: 'hands_mech_arm', slot: 'hands', name: 'Braço mecânico voltaico', price: 180, rarity: 'lendário', bundle: 'volt' },
+  { id: 'belt_bolt', slot: 'belt', name: 'Cinto do raio', price: 80, rarity: 'raro', bundle: 'volt' },
 ];
 
 export const ITEM_BY_ID = new Map(ITEMS.map(i => [i.id, i]));
@@ -99,8 +146,10 @@ export const MOTIONS: Motion[] = [
 ];
 export const MOTION_BY_ID = new Map(MOTIONS.map(m => [m.id, m]));
 
+export type BundleId = 'street' | 'striker' | 'night-clown' | 'sky-mechanic' | 'astronomer' | 'harlequin' | 'anubis' | 'volt';
+
 export interface Bundle {
-  id: 'street' | 'striker' | 'night-clown';
+  id: BundleId;
   name: string;
   subtitle: string;
   price: number;
@@ -143,6 +192,56 @@ export const BUNDLES: Bundle[] = [
       skinTone: '#e9dccf', eyeColor: '#7a4d1c', hairColor: '#d9481c',
       items: { hair: 'hair_clown', brows: 'brows_arched', beard: null, top: 'top_clown_tunic', bottom: 'bottom_clown_pants', socks: null, shoes: 'shoes_clown', headwear: null, eyewear: null, neck: null, wrist: null, bodyart: 'facepaint_midnight' },
       dance: 'thriller', celebration: 'shh',
+    }),
+  },
+  {
+    id: 'sky-mechanic', name: 'Mecânica dos Céus', subtitle: 'Conserta dirigíveis com uma chave e um sorriso', price: 320, color: '#e8735a',
+    config: base({
+      body: { ...DEFAULT_BODY, type: 1, style: .85, muscle: .1, height: -.2 },
+      face: { ...DEFAULT_FACE, shape: 'round', shapeAmount: .4, noseTip: .4, lips: .2 },
+      skinTone: '#e9c3a3', eyeColor: '#6b4423', hairColor: '#a8401f',
+      items: { hair: 'hair_wild_ponytail', brows: 'brows_arched', beard: null, top: 'top_aviator_jacket', bottom: 'bottom_cargo_navy', socks: null, shoes: 'shoes_lace_boots', headwear: 'goggles_brass', hands: 'gloves_fingerless', belt: 'belt_tool_harness', back: 'scarf_wind', prop: 'prop_wrench', eyewear: null, neck: null, wrist: null, bodyart: null },
+      tints: { 'scarf_wind:main': '#e8735a' }, dance: 'groove', celebration: 'flex',
+    }),
+  },
+  {
+    id: 'astronomer', name: 'Astrônoma', subtitle: 'Lê o futuro no movimento dos planetas', price: 320, color: '#3d4f9e',
+    config: base({
+      body: { ...DEFAULT_BODY, type: 1, style: .85, height: -.25, weight: .1 },
+      face: { ...DEFAULT_FACE, shape: 'round', shapeAmount: .5, eyeSize: .4 },
+      skinTone: '#d9a47f', eyeColor: '#3d6a7a', hairColor: '#1f2a5c',
+      items: { hair: 'hair_wavy_long', brows: 'brows_thick', beard: null, top: 'top_star_tunic', bottom: 'bottom_star_pants', socks: null, shoes: 'shoes_gold_boots', headwear: 'circlet_gear', back: 'back_star_capelet', belt: 'belt_compass', wrist: 'bracers_leather', prop: 'prop_orrery_staff', hands: null, eyewear: null, neck: null, bodyart: null },
+      dance: 'groove', celebration: 'heart',
+    }),
+  },
+  {
+    id: 'harlequin', name: 'Arlequina', subtitle: 'O espetáculo explode quando ela entra', price: 320, color: '#e0367d',
+    config: base({
+      body: { ...DEFAULT_BODY, type: 1, style: .9, height: -.1, hips: .3, legs: .3 },
+      face: { ...DEFAULT_FACE, shape: 'oval', shapeAmount: .4, eyeSize: .5, mouthWidth: .3 },
+      skinTone: '#f3d6c1', eyeColor: '#8a2a5c', hairColor: '#e0367d', hairTips: '#2ec4c4',
+      items: { hair: 'hair_curly_pigtails', brows: 'brows_arched', beard: null, top: 'top_harlequin', bottom: 'bottom_puff_shorts', socks: 'socks_harlequin', shoes: 'shoes_jester', headwear: 'hat_jester', hands: 'gloves_ruffle', prop: 'prop_bomb', bodyart: 'facepaint_diamond', back: null, belt: null, eyewear: null, neck: null, wrist: null },
+      dance: 'thriller', celebration: 'jump',
+    }),
+  },
+  {
+    id: 'anubis', name: 'Guardião Anúbis', subtitle: 'Guarda os segredos do templo do sol', price: 400, color: '#d8a531',
+    config: base({
+      body: { ...DEFAULT_BODY, style: .5, muscle: .9, shoulders: .6, torso: .5, height: .3 },
+      face: { ...DEFAULT_FACE },
+      skinTone: '#33201a', eyeColor: '#7a5a2a', hairColor: '#0f0c0b',
+      items: { hair: null, brows: 'brows_natural', beard: null, top: 'top_anubis_harness', bottom: 'bottom_shendyt', socks: null, shoes: 'shoes_gold_greaves', headwear: 'mask_anubis', neck: 'neck_usekh', back: 'back_cape_night', wrist: 'bracers_gold', prop: 'prop_sun_staff', hands: null, belt: null, eyewear: null, bodyart: null },
+      dance: 'robot', celebration: 'flex',
+    }),
+  },
+  {
+    id: 'volt', name: 'Cientista Voltaico', subtitle: 'Cada experimento termina em faísca', price: 320, color: '#3b8cff',
+    config: base({
+      body: { ...DEFAULT_BODY, style: .85, muscle: -.1, height: .1, legs: .3 },
+      face: { ...DEFAULT_FACE, shape: 'triangle', shapeAmount: .4, chin: .3, browAngle: .4 },
+      skinTone: '#e9c3a3', eyeColor: '#2f7ad8', hairColor: '#2f7ad8',
+      items: { hair: 'hair_spiky', brows: 'brows_thick', beard: null, top: 'top_lab_coat', bottom: 'bottom_cargo_dark', socks: null, shoes: 'shoes_buckle_boots', headwear: 'goggles_brass', hands: 'hands_mech_arm', belt: 'belt_bolt', back: null, prop: null, eyewear: null, neck: null, wrist: null, bodyart: null },
+      dance: 'robot', celebration: 'jump',
     }),
   },
 ];

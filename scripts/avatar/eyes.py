@@ -60,16 +60,29 @@ def sclera_texture(size=512, seed=3):
     return Image.fromarray((np.clip(img, 0, 1) * 255).astype(np.uint8), 'RGB')
 
 
+def catchlight(img):
+    """Brilho estilizado (olhos de animação): reflexo grande e um pequeno."""
+    a = np.asarray(img, np.float32) / 255 * .85
+    n = a.shape[0]
+    yy, xx = (np.mgrid[0:n, 0:n] + .5) / n * 2 - 1
+    for cx, cy, r in ((-.32, -.34, .2), (.3, .32, .08)):
+        d = np.hypot(xx - cx, yy - cy) / r
+        a = np.maximum(a, np.clip(1.5 - d * 1.5, 0, 1)[..., None] ** 1.5)
+    return Image.fromarray((np.clip(a, 0, 1) * 255).astype(np.uint8), 'RGB')
+
+
 def build(model, glb, skin_index):
     iris_tex = glb.texture(iris_texture(), fmt='jpeg', quality=92)
+    toon_tex = glb.texture(catchlight(iris_texture()), fmt='jpeg', quality=92)
     sclera_tex = glb.texture(sclera_texture(), fmt='jpeg', quality=90)
     m_sclera = glb.material('EyeSclera', base=sclera_tex, roughness=.25)
     m_iris = glb.material('EyeIris', base=iris_tex, roughness=.35, extras={'irisColor': True})
+    m_iris_toon = glb.material('EyeIrisToon', base=toon_tex, roughness=.3, emissive=(.0, .0, .0), extras={'irisColor': True, 'catchlight': True})
     m_cornea = glb.material('EyeCornea', color=(1, 1, 1, .06), roughness=.02, alpha=('BLEND', 0),
                             clearcoat=(1.0, .02), extras={'cornea': True})
     # Duas variantes: realista e estilo animação (íris maior), escolhidas no runtime pelo estilo.
-    for variant, iris_ratio in (('real', .5), ('toon', .64)):
-        build_side(model, glb, skin_index, m_sclera, m_iris, m_cornea, variant, iris_ratio)
+    for variant, iris_ratio, mi in (('real', .5, m_iris), ('toon', .63, m_iris_toon)):
+        build_side(model, glb, skin_index, m_sclera, mi, m_cornea, variant, iris_ratio)
 
 
 def build_side(model, glb, skin_index, m_sclera, m_iris, m_cornea, variant, iris_ratio):

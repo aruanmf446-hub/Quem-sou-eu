@@ -23,7 +23,7 @@ const TABS: { id: Tab; label: string; icon: IconName; focus: CameraFocus }[] = [
   { id: 'extras', label: 'Acessórios', icon: 'spark', focus: 'face' },
   { id: 'moves', label: 'Danças', icon: 'music', focus: 'full' },
 ];
-const SLOT_FOCUS: Partial<Record<Slot, CameraFocus>> = { top: 'torso', bottom: 'legs', socks: 'legs', shoes: 'feet', headwear: 'face', eyewear: 'face', neck: 'torso', wrist: 'torso', bodyart: 'torso' };
+const SLOT_FOCUS: Partial<Record<Slot, CameraFocus>> = { top: 'torso', bottom: 'legs', socks: 'legs', shoes: 'feet', headwear: 'face', eyewear: 'face', neck: 'torso', wrist: 'torso', bodyart: 'torso', hands: 'torso', back: 'back', belt: 'torso', prop: 'full' };
 
 type IconName = 'star' | 'body' | 'face' | 'hair' | 'shirt' | 'shoe' | 'spark' | 'music' | 'play' | 'pause' | 'plus' | 'minus' | 'left' | 'right' | 'spin' | 'back' | 'check' | 'undo' | 'save' | 'trash' | 'lock' | 'none' | 'legs' | 'feet' | 'torso' | 'close' | 'coin';
 const ICONS: Record<IconName, string> = {
@@ -320,7 +320,7 @@ export function AvatarStudio({ onPlay }: { onPlay?: () => void }) {
         {tab === 'shoes' && <><Section title="Calçados">{slotGrid('shoes')}</Section>{tintEditor('shoes')}</>}
 
         {tab === 'extras' && <>
-          {slotTabs(['headwear', 'eyewear', 'neck', 'wrist', 'bodyart'], extraSlot, setExtraSlot)}
+          {slotTabs(['headwear', 'eyewear', 'neck', 'back', 'belt', 'hands', 'wrist', 'prop', 'bodyart'], extraSlot, setExtraSlot)}
           <Section title={SLOT_LABELS[extraSlot]}>{slotGrid(extraSlot)}</Section>
           {tintEditor(extraSlot)}
         </>}

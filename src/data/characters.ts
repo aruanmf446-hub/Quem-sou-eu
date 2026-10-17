@@ -1,15 +1,11 @@
 import type { AvatarConfig } from '../avatar/config';
-import { MOTIONS } from '../avatar/catalog';
+import { BUNDLES, MOTIONS, type BundleId } from '../avatar/catalog';
 
-/** Personagens originais (IDs e preços legados). Cada um é um pacote completo de visual no Estúdio 3D. */
-export const CHARACTERS = [
-  { id: 'street', name: 'Nova', subtitle: 'Seu estilo começa aqui', price: 0, color: '#8463df' },
-  { id: 'striker', name: 'Camisa 10', subtitle: 'Talento de sobra, dentro e fora do campo', price: 150, color: '#efc51d' },
-  { id: 'night-clown', name: 'Riso da Meia-Noite', subtitle: 'Um espetáculo de arrepiar', price: 250, color: '#c2b9a4' },
-] as const;
+/** Personagens (pacotes completos de visual). Os três primeiros mantêm IDs e preços legados. */
+export const CHARACTERS = BUNDLES.map(b => ({ id: b.id, name: b.name, subtitle: b.subtitle, price: b.price, color: b.color }));
 /** Danças e comemorações compartilham a posse (owned_dances) e os preços do servidor. */
 export const DANCES = MOTIONS.map(m => ({ id: m.id, name: m.name, subtitle: m.subtitle, price: m.price }));
-export type CharacterId = typeof CHARACTERS[number]['id'];
+export type CharacterId = BundleId;
 export type DanceId = string;
 /**
  * Visual equipado. `character`, `dance`, `color` e `height` mantêm o formato antigo
