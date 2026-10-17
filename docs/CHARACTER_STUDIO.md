@@ -1,28 +1,32 @@
 # Estúdio de personagens 3D
 
-No menu, abra **Estúdio 3D**. Escolha uma skin e uma dança para experimentar, personalize cor e altura e clique em **Equipar personagem e dança**. O avatar equipado aparece dançando no menu **Jogar**. As cartas e o avatar 2D das partidas continuam disponíveis.
+No menu, abra **Estúdio 3D**. Experimente uma skin e uma dança, escolha cor, proporção e iluminação, e clique em **Salvar e equipar**. Para itens bloqueados, **Desbloquear e equipar** informa o total em moedas antes da compra. O personagem equipado dança no menu **Jogar**.
 
-## O que está implementado
+## Modelos e apresentação
 
-- Três personagens originais estilizados: Original, Camisa 10 e Riso da Meia-Noite.
-- Rig comum com 12 ossos (`THREE.Bone`) e malhas rígidas anexadas às articulações. Não são modelos realistas gerados por IA nem arquivos de personagens licenciados.
-- Quatro animações procedurais compartilhadas: groove, samba, robô e baile de terror.
-- Órbita, zoom, pausa, velocidade, visualização do rig, cor da roupa e altura.
-- Compra de skins e danças usando moedas do jogo; inventário e aparência no perfil.
-- Offline: armazenamento local. Online: RPC existente de compras, catálogo de preços no banco e validação de posse ao equipar.
+- Três personagens originais: Nova, Camisa 10 e Riso da Meia-Noite.
+- Modelos GLB feitos no Blender sobre a malha anatômica CC0 do MakeHuman, com mãos e rosto contínuos, olhos, sobrancelhas, cabelo, roupas e acessórios.
+- Esqueleto comum de 17 ossos e pesos de deformação. Os modelos usam `SkinnedMesh`, com compressão Meshopt e decodificador empacotado no aplicativo.
+- Cada GLB pesa aproximadamente 375–441 KB. As prévias WebP dos próprios modelos pesam cerca de 27–29 KB.
+- Danças procedurais: groove, samba, robô e baile de terror, com contramovimento do tronco, membros articulados, apoio dos pés e transição suave entre emotes.
+- Câmera de corpo inteiro, rosto e costas, zoom, órbita, giro automático e visualização de esqueleto.
+- Iluminação de estúdio com materiais físicos, reflexos de ambiente e sombras. Três ambientes: Estúdio, Arena e Meia-noite.
+- Pausa, controle de velocidade e respeito à preferência por movimento reduzido.
 
-## Banco online
+## Compras e persistência
 
-Aplique `supabase/migrations/20261017130458_character_studio.sql` depois da migração inicial, pelo fluxo habitual de migrations ou SQL Editor. A migração adiciona inventários e aparência, amplia os tipos do catálogo, substitui a compra por um wrapper invoker que chama uma função privada, e rejeita avatares com itens não adquiridos. Preços e moedas são determinados no servidor. Não há necessidade de mudar as variáveis de ambiente existentes.
+As skins e danças usam moedas do jogo. Offline, o progresso fica no navegador. Online, compras passam pela RPC e preços oficiais do banco; um trigger impede equipar itens não adquiridos.
 
-O frontend funciona offline sem banco. Sem a nova migração, as compras 3D online não funcionam. A migração foi verificada em Postgres embarcado (PGlite), mas não foi aplicada a um banco de produção.
+Aplique `supabase/migrations/20261017130458_character_studio.sql` depois da migração inicial para ativar o catálogo online. A atualização visual não exige outra migração e preserva os IDs e itens já adquiridos. A migração foi verificada em Postgres embarcado (PGlite); não foi aplicada automaticamente a um banco de produção.
 
-## Adicionar conteúdo
+Pagamentos em reais, compra de moedas, repasses para criadores, publicação de itens por terceiros, importação/exportação pelo usuário e autorig de modelos enviados não estão implementados.
 
-O catálogo fica em `src/data/characters.ts`; mantenha os preços e IDs sincronizados com uma nova migração de `shop_items`. A montagem do rig e as animações ficam em `src/components/CharacterStage.tsx`.
+## Manutenção
 
-Esta versão é um criador de personagens a partir de presets, com formas geométricas. Importação/exportação GLB, autorig de modelos enviados e criação de novas coreografias não estão implementadas. Para modelos detalhados, uma próxima etapa é produzir modelos GLB em Blender e importar animações compatíveis com o rig.
+- Catálogo e IDs: `src/data/characters.ts`.
+- Renderer e carregamento: `src/components/CharacterStage.tsx`.
+- Coreografias: `src/three/choreography.ts`.
+- Interface: `src/screens/CharacterStudio.tsx`.
+- Fonte/licenças e regeneração dos assets: `scripts/assets/README.md`.
 
-As vendas atuais usam moedas ganhas no jogo. Pagamento em reais, compra de moedas, repasses para criadores e publicação de itens por terceiros precisam de uma integração de pagamentos e validação de transações no servidor.
-
-Para comercializar o nome/imagem de Neymar ou uma reprodução de Pennywise, providencie os direitos correspondentes. Os presets incluídos são personagens originais genéricos de futebol e terror.
+`npm run assets:build` reconstrói os personagens (Blender 4.3+ e Pillow necessários). `npm run build` usa os assets já versionados. Os testes carregam os GLBs comprimidos com o mesmo decodificador do app e verificam pesos, rig, movimento real dos membros, poses válidas e ausência de acúmulo de transformações.
