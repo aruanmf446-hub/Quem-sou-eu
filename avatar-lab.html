@@ -124,8 +124,8 @@
     </div>
     <footer class="foot"><span><strong>QUEM SOU EU?</strong> / Avatar Studio • demonstração independente</span><span>WebGL · Three.js (MIT) · Sem API de avatar</span></footer>
   </main>
-  <script type="module">
-    import * as THREE from 'three';
+  <script type="module" data-vite-ignore>
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js';
     const $ = (id) => document.getElementById(id);
     const defaults = [
       {skin:'#df9d6e',hair:'#452c35',suit:'#7a54d6',style:0,accessory:1},
