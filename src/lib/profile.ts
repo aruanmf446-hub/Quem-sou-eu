@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { DEFAULT_LOOK, type AvatarLook } from '../data/characters';
 import type { Deck, Skin } from '../game/types';
 import { OFFICIAL_DECKS } from '../data/decks';
 
@@ -16,6 +17,9 @@ export interface Profile {
   ownedHats: string[];
   ownedVisors: string[];
   ownedDecks: string[];
+  ownedCharacters: string[];
+  ownedDances: string[];
+  avatar: AvatarLook;
   customDecks: Deck[];
   selectedDeckId: string;
   story: StoryProgress;
@@ -38,6 +42,9 @@ export function defaultProfile(): Profile {
     ownedHats: [],
     ownedVisors: ['gelo'],
     ownedDecks: OFFICIAL_DECKS.filter((d) => d.price === 0).map((d) => d.id),
+    ownedCharacters: ['street'],
+    ownedDances: ['groove'],
+    avatar: { ...DEFAULT_LOOK },
     customDecks: [],
     selectedDeckId: 'espaco',
     story: { unlocked: 1, best: {} },

@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Crewmate } from '../components/Crewmate';
+import { lazy, Suspense, useState } from 'react';
+const CharacterStage = lazy(() => import('../components/CharacterStage').then(m => ({ default: m.CharacterStage })));
+const CharacterStudio = lazy(() => import('./CharacterStudio').then(m => ({ default: m.CharacterStudio })));
 import { audio } from '../audio/music';
 import { maxPlayersForDeck, MIN_PLAYERS } from '../game/engine';
 import type { Deck } from '../game/types';
@@ -12,10 +13,11 @@ import { DecksTab } from './DecksTab';
 import { StoryTab } from './StoryTab';
 import { SettingsModal } from './SettingsModal';
 
-export type MenuTab = 'jogar' | 'armario' | 'loja' | 'decks' | 'historia';
+export type MenuTab = 'jogar' | 'armario' | 'loja' | 'decks' | 'historia' | 'studio';
 
 const TABS: { id: MenuTab; label: string }[] = [
   { id: 'jogar', label: 'Jogar' },
+  { id: 'studio', label: 'Estúdio 3D' },
   { id: 'armario', label: 'Armário' },
   { id: 'loja', label: 'Loja' },
   { id: 'decks', label: 'Decks' },
@@ -62,9 +64,10 @@ export function MainMenu({ tab, onTab, onQuickMatch, onRoom, onStory }: Props) {
       </header>
 
       <main className="menu-body">
-        {tab === 'jogar' && <PlayTab onQuickMatch={onQuickMatch} onRoom={onRoom} onLocker={() => onTab('armario')} />}
+        {tab === 'jogar' && <PlayTab onQuickMatch={onQuickMatch} onRoom={onRoom} onLocker={() => onTab('studio')} />}
+        {tab === 'studio' && <Suspense fallback={<p>Carregando estúdio…</p>}><CharacterStudio /></Suspense>}
         {tab === 'armario' && <LockerTab />}
-        {tab === 'loja' && <ShopTab />}
+        {tab === 'loja' && <ShopTab onStudio={() => onTab('studio')} />}
         {tab === 'decks' && <DecksTab />}
         {tab === 'historia' && <StoryTab onPlay={onStory} />}
       </main>
@@ -107,7 +110,7 @@ function PlayTab({ onQuickMatch, onRoom, onLocker }: { onQuickMatch: Props['onQu
     <div className="play">
       <section className="stage">
         <div className="stage-glow" />
-        <Crewmate skin={profile.skin} size={170} className="stage-crew float" />
+        <div className="lobby-character"><Suspense fallback={<p>Carregando personagem 3D…</p>}><CharacterStage look={profile.avatar} /></Suspense></div>
         <div className="pedestal" />
         <input
           className="name-input"
@@ -117,7 +120,7 @@ function PlayTab({ onQuickMatch, onRoom, onLocker }: { onQuickMatch: Props['onQu
           aria-label="Seu nome"
         />
         <button className="btn-ghost" onClick={onLocker}>
-          Trocar visual
+          Personalizar 3D
         </button>
       </section>
 

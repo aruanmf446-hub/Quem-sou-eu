@@ -49,6 +49,9 @@ async function doInit(): Promise<string | null> {
       ownedVisors: row.owned_visors ?? local.ownedVisors,
       ownedDecks: row.owned_decks ?? local.ownedDecks,
       story: row.story ?? local.story,
+      ownedCharacters: row.owned_characters ?? ['street'],
+      ownedDances: row.owned_dances ?? ['groove'],
+      avatar: row.avatar ?? local.avatar,
     });
   } else {
     await supabase.from('profiles').insert({ id: user.id, username: local.name, skin: local.skin, story: local.story });
@@ -62,7 +65,7 @@ async function doInit(): Promise<string | null> {
   onProfileChange((p: Profile) => {
     window.clearTimeout(timer);
     timer = window.setTimeout(() => {
-      void supabase!.from('profiles').update({ username: p.name, skin: p.skin, story: p.story }).eq('id', user!.id);
+      void supabase!.from('profiles').update({ username: p.name, skin: p.skin, story: p.story, avatar: p.avatar }).eq('id', user!.id);
     }, 800);
   });
   return user.id;
@@ -95,7 +98,7 @@ export async function listCommunityDecks(): Promise<Deck[]> {
   return (data ?? []).map(rowToDeck);
 }
 
-export type ItemKind = 'color' | 'hat' | 'visor' | 'deck';
+export type ItemKind = 'color' | 'hat' | 'visor' | 'deck' | 'character' | 'dance';
 
 /** Compra no servidor (o preço vem da tabela shop_items, não do cliente). */
 export async function purchaseRemote(kind: ItemKind, itemId: string): Promise<number | null> {
