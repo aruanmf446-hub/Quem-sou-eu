@@ -185,3 +185,33 @@ describe('configuração do avatar', () => {
     expect(c.tints).toEqual({ b: '#112233' });
   });
 });
+
+describe('transições do estúdio', () => {
+  it('retorna a uma dança já tocada sem perder o peso da animação', async () => {
+    const avatar = new Avatar(await load('public/avatar/base.glb'));
+    for (const id of ['groove', 'samba', 'groove']) {
+      avatar.play(id);
+      for (let i = 0; i < 30; i++) avatar.update(1 / 30);
+      expect((avatar as any).current.action.getEffectiveWeight()).toBeCloseTo(1);
+    }
+  });
+  it('trocar proporções durante o fade não deixa o avatar misturado com a pose T', async () => {
+    const avatar = new Avatar(await load('public/avatar/base.glb'));
+    avatar.play('groove');
+    avatar.update(.03);
+    avatar.setShape({ body: { ...DEFAULT_BODY, height: .7 }, face: DEFAULT_FACE });
+    for (let i = 0; i < 30; i++) avatar.update(1 / 30);
+    expect((avatar as any).current.action.getEffectiveWeight()).toBeCloseTo(1);
+  });
+});
+
+it('oculta a parte da coxa coberta pelo saiote e restaura ao removê-lo', async () => {
+  const avatar = new Avatar(await load('public/avatar/base.glb'));
+  avatar.equip('bottom', 'bottom_shendyt', await load(itemPath('bottom_shendyt')));
+  const thighs: THREE.Object3D[] = [];
+  avatar.model.traverse(o => { if (o.userData.region === 'thigh_b') thighs.push(o); });
+  expect(thighs.length).toBeGreaterThan(0);
+  expect(thighs.every(o => !o.visible)).toBe(true);
+  avatar.equip('bottom', null);
+  expect(thighs.every(o => o.visible)).toBe(true);
+});

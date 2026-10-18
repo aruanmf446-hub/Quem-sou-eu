@@ -331,7 +331,10 @@ export class Avatar {
       this.model.add(mesh);
       this.parts.push({ mesh, item: id });
     }
-    this.equipped.set(slot, { id, slot, meshes, hides: extras.hides ?? [], lift: extras.lift ?? 0, grip: extras.grip, hand: extras.hand });
+    // Compatibilidade com o GLB já publicado: o saiote cobre também o segundo
+    // quarto da coxa. Sem essa região, a perna atravessa o tecido ao dançar.
+    const hides = id === 'bottom_shendyt' ? [...new Set([...(extras.hides ?? []), 'thigh_b'])] : extras.hides ?? [];
+    this.equipped.set(slot, { id, slot, meshes, hides, lift: extras.lift ?? 0, grip: extras.grip, hand: extras.hand });
     this.applyMorphs();
     this.updateVisibility();
   }
@@ -385,7 +388,7 @@ export class Avatar {
     const compiledClip = getClip(id, this.base, this.skeletonRest ?? undefined);
     if (!compiledClip) return;
     const action = this.mixer.clipAction(compiledClip.clip);
-    action.reset().setLoop(THREE.LoopRepeat, Infinity).play();
+    action.reset().setEffectiveWeight(1).setEffectiveTimeScale(1).setLoop(THREE.LoopRepeat, Infinity).play();
     if (this.current) {
       this.current.action.crossFadeTo(action, fade, false);
       this.fading.push({ action: this.current.action, face: this.current.face });
@@ -403,7 +406,9 @@ export class Avatar {
     const action = this.mixer.clipAction(next.clip);
     action.reset().setLoop(THREE.LoopRepeat, Infinity).play();
     action.time = cur.action.time;
-    action.setEffectiveWeight(cur.action.getEffectiveWeight());
+    // O fade anterior será removido abaixo. Copiar seu peso parcial deixava
+    // permanentemente o restante da pose misturado com a posição de repouso (T).
+    action.setEffectiveWeight(1).setEffectiveTimeScale(1);
     for (const f of [cur, ...this.fading]) { f.action.stop(); this.mixer.uncacheAction(f.action.getClip()); }
     this.fading = [];
     this.current = { id: cur.id, action, face: next.face };

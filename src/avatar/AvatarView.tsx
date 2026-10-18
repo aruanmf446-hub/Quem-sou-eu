@@ -140,7 +140,7 @@ export function AvatarView({ config, motion = 'groove', playing = true, speed = 
       const height = Math.max(1.4, avatar.headHeight());
       const reframe = Math.abs(height - state.stage.height) > .03;
       state.stage.height = height;
-      if (reframe && !first) state.stage.focus(focusRef.current, false);
+      if (reframe || first) state.stage.focus(focusRef.current, first);
       avatar.root.visible = true;
       setSwap(null);
       onLoading?.([]);

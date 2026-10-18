@@ -208,3 +208,25 @@
 /* Foco visível para teclado */
 .as-root button:focus-visible, .as-root input:focus-visible, .as-root select:focus-visible, .as-swatch-custom:focus-within { outline: 2px solid #fff; outline-offset: 2px; }
 .as-tabs button:focus-visible, .as-item:focus-visible, .as-move:focus-visible, .as-bundle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Reserva espaço real para o cabeçalho e o player: não encobrir pés e mãos. */
+.as-stage .avatar-view {
+  inset: 64px 68px 112px 12px;
+  width: auto;
+  height: auto;
+}
+.as-camera {
+  top: 72px;
+  bottom: 112px;
+  transform: none;
+  max-height: calc(100% - 184px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.as-camera button, .as-camera > span { flex-shrink: 0; }
+.as-hint { max-width: calc(100% - 100px); text-align: center; white-space: normal; }
+@media (max-width: 900px) {
+  .as-stage { height: clamp(480px, 62svh, 560px); min-height: 480px; }
+  .as-stage .avatar-view { inset: 58px 54px 78px 6px; }
+  .as-camera { top: 64px; bottom: 78px; max-height: calc(100% - 142px); }
+}

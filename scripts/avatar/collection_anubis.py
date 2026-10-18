@@ -803,7 +803,7 @@ def bottom_shendyt(model, layout, item_id='bottom_shendyt'):
     amat = band_material(b, 'apron', [GOLD, LAPIS, GOLD, '#b8332a', GOLD, LAPIS], [.08, .14, .06, .1, .06, .14], [.95, .05, .95, .05, .95, .05], [.28, .3, .28, .4, .28, .3])
     Wa, ma = _skirt_weights(model, apos, np.full(len(apos), .8))
     emit(b, 'apron', apos, anrm, auv, atris, amat, Wa, ma)
-    return b.save({'hides': ['hips', 'thigh_a']})
+    return b.save({'hides': ['hips', 'thigh_a', 'thigh_b']})
 
 
 # --------------------------------------------------------------------------- manto noturno
