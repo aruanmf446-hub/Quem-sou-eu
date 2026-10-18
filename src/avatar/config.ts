@@ -116,7 +116,10 @@ export function morphInfluences(config: Pick<AvatarConfig, 'body' | 'face'>): Re
   pair(clamp(b.belly ?? 0), 'belly_round', 'belly_flat', out);
   const child = clamp(b.child ?? 0, 0, 1);
   if (child > 0) { out.body_child_m = child * (1 - fem); out.body_child_f = child * fem; }
-  if (b.style > 0) out.style_toon = clamp(b.style, 0, 1);
+  // O jogo é cartoon em qualquer visual, inclusive em perfis salvos com style=0.
+  // O controle regula a intensidade do cartoon, sem cair no rosto semirrealista
+  // que produzia expressões estranhas e olhos muito pequenos.
+  out.style_toon = .72 + clamp(b.style ?? 0, 0, 1) * .28;
   if (f.shape !== 'natural') out[`face_${f.shape}`] = clamp(f.shapeAmount, 0, 1);
   pair(clamp(f.width), 'face_wide', 'face_narrow', out);
   pair(clamp(f.jaw), 'jaw_strong', 'jaw_soft', out);
