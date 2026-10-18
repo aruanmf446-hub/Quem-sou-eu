@@ -53,10 +53,10 @@ def sculpt_brows(b, model, style):
         raise ValueError('Superfície facial não localizada para sobrancelhas')
     tree = cKDTree(front[:, :2])
     params = {
-        'natural': (5, .008, .0055),
-        'thick': (7, .007, .0065),
-        'thin': (3, .009, .0033),
-        'arched': (5, .014, .0050),
+        'natural': (3, .008, .0042),
+        'thick': (4, .007, .0052),
+        'thin': (2, .009, .0030),
+        'arched': (3, .014, .0042),
     }
     nstrands, arch, spread = params[style]
     material = b.glb.material(f'brow_sculpt_{style}', color=(.15, .11, .085, 1),
@@ -77,7 +77,7 @@ def sculpt_brows(b, model, style):
                 ww = 1 / np.maximum(dist, .001) ** 2
                 z = float(np.average(nearby[:, 2], weights=ww)) + .0015
                 path.append((x, y, z))
-                rr.append((.00055 + .00065 * taper) * max(.08, taper))
+                rr.append((.00024 + .00036 * taper) * max(.08, taper))
             paths.append(np.asarray(path))
             radii.append(np.asarray(rr))
         pos, nrm, uv, tris, _ = hair.tube_mesh(paths, radii, sides=6)
