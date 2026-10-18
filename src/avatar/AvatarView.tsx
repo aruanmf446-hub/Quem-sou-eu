@@ -140,6 +140,9 @@ export function AvatarView({ config, motion = 'groove', playing = true, speed = 
       const height = Math.max(1.4, avatar.headHeight());
       const reframe = Math.abs(height - state.stage.height) > .03;
       state.stage.height = height;
+      avatar.root.updateMatrixWorld(true);
+      const faceBone = avatar.bones.get('Head');
+      if (faceBone) state.stage.faceCenterY = faceBone.getWorldPosition(new THREE.Vector3()).y - .02;
       if (reframe || first) state.stage.focus(focusRef.current, first);
       avatar.root.visible = true;
       setSwap(null);
@@ -173,7 +176,12 @@ export function AvatarView({ config, motion = 'groove', playing = true, speed = 
   useEffect(() => {
     const s = ctx.current?.stage, a = ctx.current?.avatar;
     if (!s) return;
-    if (a) s.height = Math.max(1.4, a.headHeight());
+    if (a) {
+      s.height = Math.max(1.4, a.headHeight());
+      a.root.updateMatrixWorld(true);
+      const faceBone = a.bones.get('Head');
+      if (faceBone) s.faceCenterY = faceBone.getWorldPosition(new THREE.Vector3()).y - .02;
+    }
     // Na primeira exibição a câmera já nasce enquadrada; depois, transições suaves.
     s.focus(focus, status !== 'ready' || !shown.current);
     if (status === 'ready') shown.current = true;
