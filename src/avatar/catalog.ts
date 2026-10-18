@@ -178,8 +178,8 @@ export const BUNDLES: Bundle[] = [
   {
     id: 'striker', name: 'Camisa 10', subtitle: 'Talento de sobra, dentro e fora do campo', price: 150, color: '#efc51d',
     config: base({
-      body: { ...DEFAULT_BODY, muscle: .25, legs: .1 },
-      face: { ...DEFAULT_FACE, jaw: .35, chin: .2, cheekbones: .3, cheeks: -.3, age: .15, mouthCorners: .3, smile: .5, browMood: -.15 },
+      body: { ...DEFAULT_BODY, style: .9, muscle: .25, legs: .1, head: .13 },
+      face: { ...DEFAULT_FACE, shape: 'oval', shapeAmount: .38, jaw: -.12, chin: -.08, cheekbones: .24, cheeks: .18, age: -.15, eyeSize: .55, eyeShape: .25, noseWidth: -.12, noseLength: -.35, mouthCorners: .12, smile: .14, browMood: .12 },
       skinTone: '#8d5a3b', eyeColor: '#3a2215', hairColor: '#2b1d14', hairTips: '#e2bf7a',
       items: { hair: 'hair_curly_fade', brows: 'brows_thick', beard: 'beard_goatee', top: 'top_jersey_10', bottom: 'bottom_shorts_10', socks: 'socks_football_10', shoes: 'shoes_cleats_10', headwear: null, eyewear: null, neck: null, wrist: null, bodyart: 'tattoo_sleeve' },
       dance: 'samba', celebration: 'airplane',
@@ -238,8 +238,8 @@ export const BUNDLES: Bundle[] = [
   {
     id: 'volt', name: 'Cientista Voltaico', subtitle: 'Cada experimento termina em faísca', price: 320, color: '#3b8cff',
     config: base({
-      body: { ...DEFAULT_BODY, style: .7, muscle: -.3, weight: -.3, height: .3, legs: .3, head: -.1 },
-      face: { ...DEFAULT_FACE, shape: 'square', shapeAmount: .5, width: -.55, jaw: .8, chin: .9, cheekbones: .9, eyeSize: -.1, eyeDistance: -.35, eyeTilt: -.15, noseWidth: -.3, noseLength: .9, noseTip: -.5, lips: -.6, mouthWidth: .35, browHeight: -.25, browAngle: 1, ears: .35, cheeks: -.9, eyeShape: -.5, age: .7, noseBridge: 1, mouthCorners: -.2, faceLength: 1, smile: .5, squint: .5, browMood: -.6 },
+      body: { ...DEFAULT_BODY, style: .85, muscle: -.3, weight: -.15, height: .3, legs: .3, head: .12 },
+      face: { ...DEFAULT_FACE, shape: 'square', shapeAmount: .32, width: -.22, jaw: .32, chin: .12, cheekbones: .34, eyeSize: .48, eyeDistance: -.05, eyeTilt: .08, noseWidth: -.22, noseLength: .24, noseTip: -.12, lips: -.2, mouthWidth: .02, browHeight: .08, browAngle: .65, ears: .14, cheeks: .12, eyeShape: .22, age: .1, noseBridge: .42, mouthCorners: .12, faceLength: .08, smile: .18, squint: .02, browMood: .18 },
       skinTone: '#e8cbb4', eyeColor: '#2f7ad8', hairColor: '#2f7ad8',
       items: { hair: 'hair_spiky', brows: 'brows_thick', beard: null, top: 'top_lab_coat', bottom: 'bottom_cargo_dark', socks: null, shoes: 'shoes_buckle_boots', headwear: 'goggles_brass', hands: 'hands_mech_arm', belt: 'belt_bolt', back: null, prop: null, eyewear: null, neck: null, wrist: null, bodyart: null },
       dance: 'robot', celebration: 'jump',
