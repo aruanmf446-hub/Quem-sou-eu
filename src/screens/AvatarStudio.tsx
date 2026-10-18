@@ -51,7 +51,7 @@ const FACE_SHAPES: { id: FaceShape; label: string }[] = [
   { id: 'natural', label: 'Natural' }, { id: 'oval', label: 'Oval' }, { id: 'round', label: 'Redondo' }, { id: 'square', label: 'Quadrado' }, { id: 'triangle', label: 'Triangular' },
 ];
 const BODY_SLIDERS: { key: keyof BodyShape; label: string; min?: number; left: string; right: string }[] = [
-  { key: 'style', label: 'Estilo', min: 0, left: 'Realista', right: 'Animação' },
+  { key: 'style', label: 'Estilo cartoon', min: 0, left: 'Suave', right: 'Cinematográfico' },
   { key: 'type', label: 'Estrutura', min: 0, left: 'Masculina', right: 'Feminina' },
   { key: 'height', label: 'Altura', left: 'Baixa', right: 'Alta' },
   { key: 'muscle', label: 'Musculatura', left: 'Leve', right: 'Definida' },
