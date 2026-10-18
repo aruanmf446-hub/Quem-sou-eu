@@ -35,9 +35,72 @@ def overlay_item(model, layout, item_id, slot, values, offset, color_key, extras
     return b
 
 
+def sculpt_brows(b, model, style):
+    """Malha arqueada com espessura para cada sobrancelha.
+
+    A textura de pelos continua, mas agora há uma crista de geometria PBR
+    amarrada ao osso Head e aos morphs faciais. Não pinta sobrancelhas no ar.
+    """
+    from scipy.spatial import cKDTree
+    L = overlays.Landmarks(model)
+    P = model.coords
+    ids = model.mesh.group_vertices('body')
+    skin = P[ids]
+    front = skin[(skin[:, 1] > L.eye_y - .035) &
+                 (skin[:, 1] < L.eye_y + .09) &
+                 (skin[:, 2] > L.eyeL[2] - .035) &
+                 (np.abs(skin[:, 0]) < L.eye_x * 2.2)]
+    if len(front) < 20:
+        raise ValueError('Não foi possível localizar a superfície das sobrancelhas')
+    tree = cKDTree(front[:, :2])
+    params = {
+        'natural': (.0063, .008, .0034),
+        'thick': (.0092, .007, .0048),
+        'thin': (.0040, .009, .0025),
+        'arched': (.0064, .014, .0034),
+    }
+    thickness, arch, elevation = params[style]
+    material = b.glb.material(f'brow_sculpt_{style}', color=(.19, .13, .1, 1),
+                              roughness=.82, extras={'hairColor': 'brows'})
+    count, bands = 27, 7
+    for side in (-1., 1.):
+        vertices, uv, tris = [], [], []
+        for i in range(count):
+            t = i / (count - 1)
+            cx = side * (.012 + .050 * t)
+            cy = L.eye_y + .018 + arch * np.sin(np.pi * t) + .003 * (1 - t)
+            taper = max(.035, np.sin(np.pi * t)) ** .43
+            for j in range(bands):
+                v = j / (bands - 1) * 2 - 1
+                x = cx
+                y = cy + v * thickness * taper
+                _, neighbors = tree.query([x, y], k=5)
+                samples = front[np.atleast_1d(neighbors)]
+                # Interpolação frontal ponderada: evita degraus ao longo do arco.
+                dd = np.linalg.norm(samples[:, :2] - [x, y], axis=1)
+                weights = 1 / np.maximum(dd, .001) ** 2
+                zz = float(np.average(samples[:, 2], weights=weights))
+                z = zz + .0016 + elevation * (1 - v * v) * taper
+                vertices.append((x, y, z))
+                uv.append((t, (v + 1) * .5))
+        for i in range(count - 1):
+            for j in range(bands - 1):
+                a, c = i * bands + j, (i + 1) * bands + j
+                if side > 0:
+                    tris.extend(((a, c, a + 1), (a + 1, c, c + 1)))
+                else:
+                    tris.extend(((a, a + 1, c), (a + 1, c + 1, c)))
+        vertices = np.asarray(vertices)
+        tris = np.asarray(tris, dtype=np.int32)
+        normal = np.tile([0., 0., 1.], (len(vertices), 1))
+        b.bound(f'brow_sculpt_{"r" if side > 0 else "l"}', vertices, tris,
+                np.asarray(uv), material, nrm=normal, bone='Head')
+
+
 for style in ('natural', 'thick', 'thin', 'arched'):
     def _brow(model, layout, style=style):
         b = overlay_item(model, layout, f'brows_{style}', 'brows', overlays.brows_alpha(model, layout, style), .00035, 'brows')
+        sculpt_brows(b, model, style)
         return b.save({})
     item(f'brows_{style}', 'brows')(_brow)
 
