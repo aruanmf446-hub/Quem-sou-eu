@@ -1,3 +1,4 @@
+import ASSET_VERSIONS from './assetVersions.json';
 import { DEFAULT_BODY, DEFAULT_FACE, type AvatarConfig, type Slot } from './config';
 
 export type Rarity = 'comum' | 'raro' | 'épico' | 'lendário';
@@ -255,5 +256,7 @@ export const HAIR_COLORS = ['#0f0c0b', '#24170f', '#3a2618', '#5b3a22', '#8a5a33
 export const EYE_COLORS = ['#2a1810', '#4a2c1a', '#6b4423', '#7a5a2a', '#4f6b3a', '#3d6a7a', '#5c7fa6', '#8a8f96'];
 export const OUTFIT_COLORS = ['#f2f2ee', '#1e2230', '#2d3442', '#7c5ce0', '#efc51d', '#169a4a', '#1f2c66', '#e65068', '#2f7ad8', '#d9481c', '#c2b9a4', '#111111'];
 
-export const itemUrl = (id: string) => `/avatar/items/${id}.glb`;
-export const thumbUrl = (id: string) => `/avatar/thumbs/${id}.webp`;
+/** URL com a versão do conteúdo (evita misturar arquivos novos e antigos em cache). */
+export const versioned = (path: string) => { const v = (ASSET_VERSIONS as Record<string, string>)[path]; return v ? `${path}?v=${v}` : path; };
+export const itemUrl = (id: string) => versioned(`/avatar/items/${id}.glb`);
+export const thumbUrl = (id: string) => versioned(`/avatar/thumbs/${id}.webp`);

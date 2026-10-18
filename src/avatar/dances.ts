@@ -119,7 +119,7 @@ export const HEART: Choreography = {
 // Silêncio na arena: dedo nos lábios, depois braços abertos.
 const shh: Pose = {
   hips: [0, -.01, 0], chest: [-2, -6, 0], head: [8, -8, -6], legL: stance(), legR: stance(-.03),
-  armL: arm(12, 0, 15, { fist: .3 }), armR: arm(18, 62, 148, { twist: 25, hand: 'point', wrist: [0, -10, 0] }),
+  armL: arm(12, 0, 15, { fist: .3 }), armR: arm(18, 76, 122, { twist: 0, hand: 'point', wrist: [50, 0, 0] }),
   face: { pucker: .6, brows_down: .4, squint: .2 },
 };
 const open: Pose = {

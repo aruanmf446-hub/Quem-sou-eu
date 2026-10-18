@@ -17,3 +17,5 @@ for (const file of files) {
   await io.write(file, doc);
   console.log(`${basename(file)}: ${(before / 1024).toFixed(0)} KB -> ${(statSync(file).size / 1024).toFixed(0)} KB`);
 }
+
+await import('./versions.mjs');

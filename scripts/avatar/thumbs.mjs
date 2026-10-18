@@ -49,3 +49,5 @@ for (const j of jobs) {
   console.log('ok', j.name);
 }
 await browser.close();
+
+await import('./versions.mjs');

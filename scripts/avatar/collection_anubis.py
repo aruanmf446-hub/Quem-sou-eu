@@ -721,11 +721,11 @@ def bottom_shendyt(model, layout, item_id='bottom_shendyt'):
     for i, t in enumerate(np.linspace(0, 1, R)):
         y = y_top + (y_hem - y_top) * t
         # Cone: começa justo na cintura e abre para cobrir as coxas com folga.
-        rx = .16 + .1 * t ** .8
-        rz = .13 + .05 * t ** .8
+        rx = .17 + .11 * t ** .8
+        rz = .14 + .07 * t ** .8
         rows.append(c0 + np.array([0, y, 0]) + d * np.array([rx, 0, rz]))
     P = np.vstack(rows)
-    P = _push_body(model, P, .016)
+    P = _push_body(model, P, .028)
     G3 = P.reshape(R, C, 3)
     # Envelope convexo por linha (o tecido não entra entre as pernas).
     for i in range(R):
@@ -772,7 +772,8 @@ def bottom_shendyt(model, layout, item_id='bottom_shendyt'):
                            normal=b.glb.texture(noise_normal(256, 30, 1.2, 5), fmt='png'), normal_scale=.6,
                            metallic=1.0, roughness=1.0, sheen=((.6, .58, .5), .6), double=True)
     t_row = np.repeat(np.linspace(0, 1, R), C)
-    W, morphs = _skirt_weights(model, pos, .25 + .35 * t_row)
+    # Mais peso nas coxas para baixo: o saiote acompanha a perna e ela não atravessa o linho ao dançar.
+    W, morphs = _skirt_weights(model, pos, .3 * (1 - t_row) + .05)
     emit(b, 'skirt', pos, nrm, uv, tris, linen, W, morphs)
     # Cinto de ouro e lápis na cintura.
     ax, u, v = np.array([0, 1., 0]), np.array([0, 0, 1.]), np.array([1., 0, 0])
@@ -803,7 +804,7 @@ def bottom_shendyt(model, layout, item_id='bottom_shendyt'):
     amat = band_material(b, 'apron', [GOLD, LAPIS, GOLD, '#b8332a', GOLD, LAPIS], [.08, .14, .06, .1, .06, .14], [.95, .05, .95, .05, .95, .05], [.28, .3, .28, .4, .28, .3])
     Wa, ma = _skirt_weights(model, apos, np.full(len(apos), .8))
     emit(b, 'apron', apos, anrm, auv, atris, amat, Wa, ma)
-    return b.save({'hides': ['hips', 'thigh_a']})
+    return b.save({'hides': ['hips', 'thigh_a', 'thigh_b']})
 
 
 # --------------------------------------------------------------------------- manto noturno
@@ -966,7 +967,7 @@ def shoes_gold_greaves(model, layout, item_id='shoes_gold_greaves'):
 # --------------------------------------------------------------------------- cetro solar
 
 IDLE_HAND = (np.array([-.303, .925, .082]), [0.265, -0.117, 0.295, 0.91])
-STAFF = {'center': np.array([-.29, .835, .106]), 'idle': .65, 'below': .62, 'above': .95}
+STAFF = {'center': np.array([-.29, .835, .106]), 'idle': .65, 'below': .42, 'above': .95}
 
 
 def prop_sun_staff(model, layout, item_id='prop_sun_staff'):

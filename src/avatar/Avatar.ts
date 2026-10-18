@@ -6,6 +6,7 @@ import { morphInfluences, restExpression, type AvatarConfig } from './config';
 import { applyHairTips, makeSkinMaterial, skinToneColors, type SkinUniforms } from './materials';
 import { compile, PoseSolver, RestSkeleton, sampleFace, type CompiledClip } from './animation';
 import { CHOREOGRAPHIES } from './dances';
+import { versioned } from './catalog';
 
 let restSkeleton: RestSkeleton | null = null;
 const grips = new Map<string, Map<string, THREE.Quaternion>>();
@@ -37,7 +38,7 @@ export function getClip(id: string, base: GLTF): CompiledClip | null {
   return c;
 }
 
-export const AVATAR_BASE_URL = '/avatar/base.glb';
+export const AVATAR_BASE_URL = versioned('/avatar/base.glb');
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const cache = new Map<string, Promise<GLTF>>();
 

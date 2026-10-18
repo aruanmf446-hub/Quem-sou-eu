@@ -29,6 +29,7 @@ Tudo o mais é original do projeto, gerado proceduralmente: texturas de pele, ol
 - `overlays.py`, `hair.py`, `eyes.py`, `skin_textures.py`: pelos sobre a pele, cabelos com volume, olhos e pele.
 - `wardrobe.py` (+ módulos de peças) e `build_items.py`: catálogo de peças. Cada ID precisa existir também em `src/avatar/catalog.ts`.
 - `collection_*.py`: as cinco coleções estilizadas (Mecânica dos Céus, Astrônoma, Arlequina, Guardião Anúbis, Cientista Voltaico); `hair_styled.py`/`hair_styles.py`: cabelo em mechas esculpidas; `isosurface.py`: extração de superfície (surface nets, só numpy) para as formas modeladas por campos de distância do Anúbis.
+- `versions.mjs`: grava `src/avatar/assetVersions.json` (hash do conteúdo de cada GLB e miniatura); as URLs ganham `?v=<hash>` para que navegador e CDN nunca misturem arquivos novos e antigos. Roda sozinho ao fim de `optimize.mjs` e `thumbs.mjs`.
 - `optimize.mjs`: Meshopt + quantização. O runtime recupera a dequantização embutida nas matrizes inversas.
 - `preview/`: ferramentas de validação visual (Playwright): `shoot.mjs`, `studio.mjs`, `e2e.mjs`.
 
