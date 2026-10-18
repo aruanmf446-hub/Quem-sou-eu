@@ -23,11 +23,11 @@ export class AvatarStage {
   readonly camera = new THREE.PerspectiveCamera(28, 1, .05, 60);
   readonly controls: OrbitControls;
   // Luz de cinema de animação: chave quente e forte, preenchimento frio e baixo, dois recortes coloridos por trás.
-  private key = new THREE.DirectionalLight('#ffffff', 3.0);
-  private fill = new THREE.DirectionalLight('#ffffff', .5);
-  private rim = new THREE.DirectionalLight('#ffffff', 2.6);
-  private rim2 = new THREE.DirectionalLight('#ffffff', 1.6);
-  private hemi = new THREE.HemisphereLight('#dfe8ff', '#2a2420', .4);
+  private key = new THREE.DirectionalLight('#ffffff', 2.6);
+  private fill = new THREE.DirectionalLight('#ffffff', .85);
+  private rim = new THREE.DirectionalLight('#ffffff', 1.5);
+  private rim2 = new THREE.DirectionalLight('#ffffff', 1.0);
+  private hemi = new THREE.HemisphereLight('#dfe8ff', '#2a2420', .55);
   private floorMat = new THREE.MeshStandardMaterial({ color: '#1b2130', roughness: .42, metalness: .35 });
   private ringMat = new THREE.MeshBasicMaterial({ color: '#c6ff6a' });
   private envMap: THREE.Texture;
@@ -59,8 +59,8 @@ export class AvatarStage {
         this.composer = new EffectComposer(this.renderer, target);
         this.composer.addPass(new RenderPass(this.scene, this.camera));
         const gtao = new GTAOPass(this.scene, this.camera, 1, 1);
-        gtao.blendIntensity = .85;
-        gtao.updateGtaoMaterial({ radius: .14, distanceExponent: 1.4, thickness: 1.2, scale: 1.15, samples: 16, distanceFallOff: 1, screenSpaceRadius: false });
+        gtao.blendIntensity = .48;
+        gtao.updateGtaoMaterial({ radius: .10, distanceExponent: 1.4, thickness: .8, scale: 1.15, samples: 16, distanceFallOff: 1, screenSpaceRadius: false });
         gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 });
         this.composer.addPass(gtao);
         this.composer.addPass(new OutputPass());
@@ -73,7 +73,7 @@ export class AvatarStage {
     pmrem.dispose();
     this.scene.environment = this.envMap;
     if (opts.background) this.scene.background = new THREE.Color(opts.background);
-    this.scene.environmentIntensity = .32;
+    this.scene.environmentIntensity = .42;
     this.key.position.set(3.0, 3.4, 2.6);
     this.key.castShadow = true;
     this.key.shadow.mapSize.setScalar(coarse ? 1024 : 2048);
