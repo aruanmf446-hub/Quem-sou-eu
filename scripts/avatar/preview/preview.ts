@@ -29,6 +29,9 @@ const config: AvatarConfig = {
   avatar.root.rotation.y = Number(params.get('rot') ?? 0);
   if (params.get('nobody')) avatar.model.traverse(o => { if (o.name.startsWith('body_')) o.visible = false; });
   stage.height = avatar.headHeight();
+  avatar.root.updateMatrixWorld(true);
+  const faceBone = avatar.bones.get('Head');
+  if (faceBone) stage.faceCenterY = faceBone.getWorldPosition(new THREE.Vector3()).y - .02;
   stage.focus((params.get('view') ?? 'full') as CameraFocus, true);
   if (params.get('q')) for (const part of params.get('q')!.split(';')) {
     const [name, v] = part.split(':'); const [x, y, z] = v.split(',').map(Number);
