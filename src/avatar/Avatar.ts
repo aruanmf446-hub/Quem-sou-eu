@@ -258,9 +258,9 @@ export class Avatar {
     this.rest = restExpression(config.face);
     for (const name of EXPRESSIONS) if (!name.startsWith('expr_blink')) this.expression[name] = Math.max(this.animatedExpression[name] ?? 0, this.rest[name] ?? 0);
     this.feminine = config.body.type;
-    this.toon = (config.body.style ?? 0) >= .45;
+    this.toon = true; // olhos com íris grande em todos os avatares cartoon, inclusive perfis antigos
     // Estilo animação: pele mais lisa (menos poros) e bochechas levemente coradas.
-    const smooth = 1 - .8 * Math.min(1, Math.max(0, config.body.style ?? 0));
+    const smooth = 1 - .8 * (.72 + .28 * Math.min(1, Math.max(0, config.body.style ?? 0)));
     for (const m of this.skinMaterials) {
       const base = (m.userData.baseNormalScale as THREE.Vector2 | undefined) ?? (m.userData.baseNormalScale = m.normalScale.clone());
       m.normalScale.copy(base).multiplyScalar(smooth);
