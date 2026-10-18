@@ -5,6 +5,13 @@ on:
   push:
     paths:
       - '.github/workflows/avatar-face-preview.yml'
+      - 'scripts/avatar/sculpt_face.py'
+      - 'scripts/avatar/spec.py'
+      - 'scripts/avatar/build_items.py'
+      - 'scripts/avatar/eyes.py'
+      - 'src/avatar/config.ts'
+      - 'src/avatar/catalog.ts'
+      - 'src/avatar/stage.ts'
 
 permissions:
   contents: read
