@@ -86,49 +86,9 @@ class AvatarModel:
         self.normals = vertex_normals(self.coords, self.body_tris)
 
     def _sculpt_toon_face(self):
-        """Relevo autoral de bochechas, pálpebras e testa no morph existente style_toon.
-
-        Mantém o mesmo nome de morph e os mesmos ossos em base e itens.
-        Os volumes extras são aplicados somente à superfície de pele do rosto;
-        os globos oculares e dentes continuam seguindo seus alvos próprios.
-        """
-        eye_l = self.mesh.joint('helper-l-eye', self.coords)
-        eye_r = self.mesh.joint('helper-r-eye', self.coords)
-        ey = (eye_l[1] + eye_r[1]) * .5
-        ez = (eye_l[2] + eye_r[2]) * .5
-        half = max(abs(eye_l[0] - eye_r[0]) * .5, .025)
-        P = self.coords
-        delta = np.zeros_like(P)
-
-        def falloff(x, y, z, rx, ry, rz):
-            d = ((P[:, 0] - x) / rx) ** 2
-            d += ((P[:, 1] - y) / ry) ** 2
-            d += ((P[:, 2] - z) / rz) ** 2
-            return np.exp(-2.0 * d)
-
-        for side in (-1., 1.):
-            # Maçãs salientes, bochechas arredondadas e maçãs do sorriso.
-            apples = falloff(side * half * .95, ey - .067, ez + .003,
-                             half * 1.3, .066, .105)
-            delta[:, 0] += side * .0045 * apples
-            delta[:, 2] += .015 * apples
-            # Arcadas com massa acima dos olhos, não somente textura pintada.
-            brow = falloff(side * half * .9, ey + .031, ez - .002,
-                           half * 1.1, .026, .075)
-            delta[:, 2] += .008 * brow
-            delta[:, 1] += .002 * brow
-            # Transição da têmpora para a linha da mandíbula.
-            jaw = falloff(side * half * 1.22, ey - .127, ez - .032,
-                          half * 1.1, .061, .075)
-            delta[:, 0] -= side * .005 * jaw
-
-        # Limitado à pele: o mesmo morph é transferido a roupas e acessórios
-        # pelo pipeline usual (nenhum esqueleto novo e nenhum rig individual).
-        body = self.mesh.group_vertices('body')
-        mask = np.zeros(len(P), dtype=bool)
-        mask[body] = True
-        delta[~mask] = 0
-        self.morphs['style_toon'] += delta
+        """Amplia o morph de animação com escultura anatômica compartilhada."""
+        from sculpt_face import cinematic_delta
+        self.morphs['style_toon'] += cinematic_delta(self)
 
     def smoothed(self, iters=12):
         """Corpo alisado (sem mamilos/umbigo/veias) para colisão de roupas."""
