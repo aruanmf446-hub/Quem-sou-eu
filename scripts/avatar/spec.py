@@ -24,10 +24,10 @@ FACE_BASE = [
     ('head/head-age-decr', .45), ('mouth/mouth-upperlip-volume-decr', .43), ('mouth/mouth-lowerlip-volume-decr', .40),
     ('mouth/mouth-scale-horiz-decr', .2), ('nose/nose-scale-horiz-decr', .35), ('nose/nose-point-width-decr', .35),
     ('nose/nose-width2-decr', .3), ('nose/nose-nostrils-width-decr', .4),
-    ('cheek/l-cheek-bones-incr', .5), ('cheek/r-cheek-bones-incr', .5), ('cheek/l-cheek-volume-decr', .4), ('cheek/r-cheek-volume-decr', .4), ('mouth/mouth-trans-backward', .40), ('mouth/mouth-scale-depth-decr', .25), ('mouth/mouth-philtrum-volume-decr', .4),
+    ('cheek/l-cheek-bones-incr', .5), ('cheek/r-cheek-bones-incr', .5), ('cheek/l-cheek-volume-incr', .28), ('cheek/r-cheek-volume-incr', .28), ('mouth/mouth-trans-backward', .40), ('mouth/mouth-scale-depth-decr', .25), ('mouth/mouth-philtrum-volume-decr', .4),
     ('nose/nose-volume-decr', .3), ('nose/nose-scale-depth-decr', .15),
     ('nose/nose-hump-decr', .3), ('nose/nose-point-up', .15), ('head/head-square', .25), ('chin/chin-width-decr', .15),
-    ('chin/chin-prominent-incr', .3), ('chin/chin-height-incr', .3), ('head/head-scale-horiz-decr', .28), ('forehead/forehead-temple-decr', .3),
+    ('chin/chin-prominent-decr', .18), ('chin/chin-height-decr', .22), ('head/head-scale-horiz-incr', .12), ('forehead/forehead-temple-decr', .3),
     ('eyes/l-eye-scale-incr', .4), ('eyes/r-eye-scale-incr', .4), ('eyes/l-eye-height2-incr', .4), ('eyes/r-eye-height2-incr', .4),
 ]
 
