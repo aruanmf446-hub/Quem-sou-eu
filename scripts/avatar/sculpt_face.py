@@ -44,9 +44,10 @@ def cinematic_delta(model):
     # Junta as áreas, mas suaviza para zero antes da cervical. Isto mantém
     # todas as peças com os mesmos pesos e reduz degraus na nuca.
     head = smooth(ey - .235 * unit, ey - .153 * unit, y)
-    head *= 1 - smooth(ey + .242 * unit, ey + .315 * unit, y)
+    # Não cortar o volume no topo do crânio: crescimento suave em toda a calota.
+    head *= 1 - smooth(ey + .310 * unit, ey + .390 * unit, y)
     upper = smooth(ey - .055 * unit, ey + .055 * unit, y)
-    front = smooth(ez - .072 * unit, ez + .022 * unit, z)
+    front = smooth(ez - .080 * unit, ez + .016 * unit, z)
     skin = np.zeros(len(P), dtype=np.float64)
     skin[model.mesh.group_vertices('body')] = 1.
     face = head * front * skin
@@ -54,10 +55,10 @@ def cinematic_delta(model):
     # 1. Silhueta: crânio largo/arredondado, testa suavemente projetada.
     #    O topo permanece alto; o terço inferior é comprimido em torno dos olhos.
     skull = head * upper
-    d[:, 0] += x * (.11 * skull)
-    d[:, 2] += (z - (ez - .075 * unit)) * (.085 * skull)
+    d[:, 0] += x * (.155 * skull)
+    d[:, 2] += (z - (ez - .075 * unit)) * (.11 * skull)
     lower = head * (1 - smooth(ey - .018 * unit, ey + .023 * unit, y))
-    d[:, 1] += np.maximum(ey - y, 0.) * .22 * lower
+    d[:, 1] += np.maximum(ey - y, 0.) * .31 * lower
 
     # 2. Órbitas: abertura maior e ligeiramente mais oval; inclui os próprios
     #    helpers do globo, logo os alvos do olho acompanham a pele.
@@ -65,39 +66,50 @@ def cinematic_delta(model):
         cx = side * ex
         orbital = gaussian(x, cx, .059 * unit, y, ey, .050 * unit,
                            z, ez, .105 * unit) * head
-        d[:, 0] += (x - cx) * .06 * orbital
-        d[:, 1] += (y - ey) * .09 * orbital
+        d[:, 0] += (x - cx) * .11 * orbital
+        d[:, 1] += (y - ey) * .17 * orbital
 
         # Arcada e pálpebras são saliências em geometria, não maquiagem plana.
         arc = gaussian(x, side * ex * .99, .050 * unit,
                        y, ey + .033 * unit, .024 * unit)
         lid_up = gaussian(x, cx, .050 * unit, y, ey + .015 * unit, .012 * unit)
         lid_low = gaussian(x, cx, .048 * unit, y, ey - .019 * unit, .013 * unit)
-        d[:, 2] += face * unit * (.0050 * arc + .0027 * lid_up + .0015 * lid_low)
+        d[:, 2] += face * unit * (.009 * arc + .0034 * lid_up + .0025 * lid_low)
 
         # Maçãs do rosto: massas arredondadas sob as órbitas.
         apple = gaussian(x, side * ex * 1.04, .055 * unit,
                          y, ey - .058 * unit, .054 * unit,
                          z, ez + .012 * unit, .095 * unit)
-        d[:, 2] += .015 * unit * apple * face
-        d[:, 0] += side * .0045 * unit * apple * face
+        d[:, 2] += .020 * unit * apple * face
+        d[:, 0] += side * .008 * unit * apple * face
 
     # 3. Mandíbula curta, menos pontiaguda; transição suave para o pescoço.
     jaw = gaussian(x, 0., .135 * unit, y, ey - .135 * unit,
                    .066 * unit) * face
-    d[:, 0] -= x * .105 * jaw
+    d[:, 0] -= x * .17 * jaw
     d[:, 2] += .005 * unit * jaw
 
     # 4. Ponte e ponta do nariz simplificadas, sem eliminar o seu perfil.
     nose = gaussian(x, 0., .037 * unit, y, ey - .044 * unit,
                     .063 * unit) * face
     d[:, 0] -= x * .11 * nose
-    d[:, 2] -= .0040 * unit * nose
+    d[:, 2] -= .0055 * unit * nose
     # 5. Lábios volumétricos e cantos controlados: expressão é animação, não
     #    uma abertura forçada permanente na malha.
     lip = gaussian(x, 0., .043 * unit, y, ey - .079 * unit,
                    .019 * unit) * face
-    d[:, 2] += .004 * unit * lip
+    d[:, 2] += .0055 * unit * lip
+
+    # Reforça o arco das têmporas e remove o aspecto de rosto comprido.
+    # A máscara facial é contínua até a linha da mandíbula, sem fendas na junção.
+    temple = gaussian(np.abs(x), ex * 1.75, .064 * unit,
+                      y, ey + .018 * unit, .093 * unit) * head
+    d[:, 0] += np.sign(x) * .009 * unit * temple
+    d[:, 2] += .004 * unit * temple
+    # Não deslocar a boca inteira para a frente: apenas suavizar o filtrum.
+    philtrum = gaussian(x, 0., .025 * unit, y, ey - .068 * unit,
+                        .025 * unit) * face
+    d[:, 2] -= .003 * unit * philtrum
 
     if not np.all(np.isfinite(d)):
         raise ValueError('Escultura facial inválida')
