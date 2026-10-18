@@ -112,7 +112,7 @@ def free_path(vol, start, direction, length, k=18, gravity=.6, wave=(0, 0, 0), c
     return pts
 
 
-def clump_mesh(paths, widths, vol, sides=6, flat=.42, twist=None):
+def clump_mesh(paths, widths, vol, sides=10, flat=.42, twist=None):
     """Tubos achatados: largura w(t), espessura flat*w, face larga voltada para fora da cabeça."""
     pos, nrm, uv, tris, along = [], [], [], [], []
     base = 0
@@ -133,11 +133,15 @@ def clump_mesh(paths, widths, vol, sides=6, flat=.42, twist=None):
             for s in range(sides):
                 a = 2 * np.pi * s / sides
                 cx, cy = np.cos(a), np.sin(a)
-                # Perfil levemente pontudo nas bordas (mecha esculpida).
-                ex = np.sign(cx) * abs(cx) ** .8
-                pos.append(path[k] + wide[k] * ex * w[k] / 2 + out[k] * cy * w[k] * flat / 2)
-                n = wide[k] * cx * flat + out[k] * cy
-                nrm.append(n / np.linalg.norm(n))
+                # Seção assimétrica em folha, com nervura central em ALTO-RELEVO.
+                # Não é um cilindro: a crista recebe luz e as bordas recuam.
+                ex = np.sign(cx) * abs(cx) ** .87
+                ridge = max(cy, 0) * (1 - abs(cx) ** 1.4) * .18
+                width = w[k] * (.96 + .04 * np.sin(k / max(K - 1, 1) * np.pi))
+                pos.append(path[k] + wide[k] * ex * width / 2
+                           + out[k] * (cy * width * flat / 2 + ridge * width))
+                n = wide[k] * (cx * flat - ridge * np.sign(cx) * .38) + out[k] * (cy + ridge * .55)
+                nrm.append(n / max(np.linalg.norm(n), 1e-8))
                 uv.append((s / sides, L[k] * 12))
                 along.append(k / (K - 1))
         for k in range(K - 1):
