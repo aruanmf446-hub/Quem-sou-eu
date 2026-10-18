@@ -163,8 +163,8 @@ export class AvatarStage {
       back: [h * .57, h * .54, fullDistance],
       // O valor h inclui cabelo alto: NÃO o use para centralizar o rosto.
       // Distância suficiente para enquadrar sobrancelhas, olhos, nariz e boca.
-      face: [this.faceCenterY, this.faceCenterY, 1.47],
-      eye: [this.faceCenterY + .035, this.faceCenterY + .035, .54],
+      face: [this.faceCenterY - .045, this.faceCenterY - .045, 1.18],
+      eye: [this.faceCenterY + .027, this.faceCenterY + .027, .62],
       torso: [h * .72, h * .7, 1.75],
       legs: [h * .32, h * .3, 2.1],
       feet: [h * .1, h * .06, 1.25],
