@@ -182,13 +182,17 @@ def hair_curly_fade(model, layout):
         aaz = np.abs(np.degrees(np.arctan2(rel[:, 0], rel[:, 2])))
         floor = np.maximum(hair.scalp_line(L, aaz) + .006, L.eye_y + .05 + .012 * smoothstep(60, 130, aaz))
         return smoothstep(floor, floor + .016, P[:, 1]) * (1 - smoothstep(145, 160, aaz))
-    offset = curl_shell(b, model, layout, region, .016)
+    # Massa escultural (casca) + cachos grandes. Os fios antigos eram tão
+    # finos que pareciam arames. Cada coil agora lê como uma mecha de cartoon.
+    offset = curl_shell(b, model, layout, region, .024, freq=330)
     rng = np.random.default_rng(10)
-    roots, normals, _ = hair.scalp_samples(model, .0085, lambda P, N, h, aaz: region(P) > .5)
+    roots, normals, _ = hair.scalp_samples(model, .0113, lambda P, N, h, aaz: region(P) > .5)
     lift = np.array([offset(roots[i:i + 1], normals[i:i + 1])[0] for i in range(len(roots))])
     roots = roots + normals * (lift[:, None] - .004)
-    add_coils(b, model, hair_material(b, 'curls', .62), roots, normals, rng, length=(.012, .022), radius=(.0028, .0042),
-              turns=(1.8, 2.8), thickness=(.0015, .0022), lean=np.array([0, .1, .45]), seg_per_turn=8, sides=5)
+    add_coils(b, model, hair_material(b, 'curls', .52), roots, normals, rng,
+              length=(.020, .034), radius=(.0038, .0058),
+              turns=(1.2, 2.0), thickness=(.0028, .0040),
+              lean=np.array([0, .2, .34]), seg_per_turn=11, sides=7)
     return b.save({'tips': True})
 
 
