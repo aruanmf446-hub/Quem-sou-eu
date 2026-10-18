@@ -21,10 +21,10 @@ ATHLETIC = [
 
 # Ajustes de rosto da base (mantidos também no corpo feminino): mais jovem e expressivo.
 FACE_BASE = [
-    ('head/head-age-decr', .45), ('mouth/mouth-upperlip-volume-decr', .7), ('mouth/mouth-lowerlip-volume-decr', .6),
+    ('head/head-age-decr', .45), ('mouth/mouth-upperlip-volume-decr', .43), ('mouth/mouth-lowerlip-volume-decr', .40),
     ('mouth/mouth-scale-horiz-decr', .2), ('nose/nose-scale-horiz-decr', .35), ('nose/nose-point-width-decr', .35),
     ('nose/nose-width2-decr', .3), ('nose/nose-nostrils-width-decr', .4),
-    ('cheek/l-cheek-bones-incr', .5), ('cheek/r-cheek-bones-incr', .5), ('cheek/l-cheek-volume-decr', .4), ('cheek/r-cheek-volume-decr', .4), ('mouth/mouth-trans-backward', .6), ('mouth/mouth-scale-depth-decr', .45), ('mouth/mouth-philtrum-volume-decr', .4),
+    ('cheek/l-cheek-bones-incr', .5), ('cheek/r-cheek-bones-incr', .5), ('cheek/l-cheek-volume-decr', .4), ('cheek/r-cheek-volume-decr', .4), ('mouth/mouth-trans-backward', .40), ('mouth/mouth-scale-depth-decr', .25), ('mouth/mouth-philtrum-volume-decr', .4),
     ('nose/nose-volume-decr', .3), ('nose/nose-scale-depth-decr', .15),
     ('nose/nose-hump-decr', .3), ('nose/nose-point-up', .15), ('head/head-square', .25), ('chin/chin-width-decr', .15),
     ('chin/chin-prominent-incr', .3), ('chin/chin-height-incr', .3), ('head/head-scale-horiz-decr', .28), ('forehead/forehead-temple-decr', .3),
@@ -116,7 +116,7 @@ TARGET_MORPHS = {
     'style_toon': [('head/head-scale-vert-incr', .9), ('head/head-scale-horiz-incr', 1.0), ('head/head-scale-depth-incr', .8),
                    ('eyes/l-eye-scale-incr', 2.0), ('eyes/r-eye-scale-incr', 2.0), ('eyes/l-eye-height2-incr', .3), ('eyes/r-eye-height2-incr', .3),
                    ('nose/nose-scale-horiz-decr', .7), ('nose/nose-scale-vert-decr', .7), ('nose/nose-scale-depth-decr', .6), ('nose/nose-point-up', .5),
-                   ('mouth/mouth-scale-horiz-decr', .35), ('mouth/mouth-scale-vert-decr', .3), ('mouth/mouth-upperlip-volume-decr', .3),
+                   ('mouth/mouth-scale-horiz-decr', .12), ('mouth/mouth-scale-vert-decr', .10), ('mouth/mouth-upperlip-volume-decr', .08),
                    ('chin/chin-height-decr', .5), ('chin/chin-width-decr', .4), ('chin/chin-prominent-decr', .3),
                    ('cheek/l-cheek-volume-incr', .45), ('cheek/r-cheek-volume-incr', .45), ('head/head-oval', .35), ('cheek/l-cheek-bones-decr', .4), ('cheek/r-cheek-bones-decr', .4),
                    ('forehead/forehead-scale-vert-incr', .4), ('neck/measure-neck-circ-decr', .5),
