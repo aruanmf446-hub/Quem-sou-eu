@@ -60,6 +60,8 @@ const BODY_SLIDERS: { key: keyof BodyShape; label: string; min?: number; left: s
   { key: 'torso', label: 'Tronco', left: 'Reto', right: 'Em V' },
   { key: 'hips', label: 'Quadril', left: 'Estreito', right: 'Largo' },
   { key: 'legs', label: 'Pernas', left: 'Curtas', right: 'Longas' },
+  { key: 'child', label: 'Idade do corpo', min: 0, left: 'Adulto', right: 'Criança' },
+  { key: 'belly', label: 'Barriga', left: 'Chapada', right: 'Redonda' },
   { key: 'head', label: 'Cabeça', left: 'Menor', right: 'Maior' },
 ];
 const FACE_GROUPS: { title: string; items: { key: keyof FaceConfig; label: string; left: string; right: string; min?: number }[] }[] = [

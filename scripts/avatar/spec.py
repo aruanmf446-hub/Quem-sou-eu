@@ -41,6 +41,8 @@ MACRO_MORPHS = {
     'weight_up_f': dict(gender=0.0, weight=1.0), 'weight_down_f': dict(gender=0.0, weight=.1),
     'height_up_m': dict(height=.8), 'height_down_m': dict(height=.25),
     'height_up_f': dict(gender=0.0, height=.8), 'height_down_f': dict(gender=0.0, height=.25),
+    # Corpo infantil (macro "child" do MakeHuman, ~11 anos): baixo, cabeça proporcionalmente maior, membros curtos.
+    'body_child_m': dict(age=0.0), 'body_child_f': dict(gender=0.0, age=0.0),
 }
 
 # Morphs locais: nome -> lista de (target, peso). Alvos l-/r- somados para simetria.
@@ -57,6 +59,8 @@ TARGET_MORPHS = {
     'legs_short': [('legs/upperlegs-height-decr', .6), ('legs/lowerlegs-height-decr', .6)],
     'head_big': [('head/head-scale-vert-incr', .55), ('head/head-scale-horiz-incr', .55), ('head/head-scale-depth-incr', .55)],
     'head_small': [('head/head-scale-vert-decr', .55), ('head/head-scale-horiz-decr', .55), ('head/head-scale-depth-decr', .55)],
+    'belly_round': [('stomach/stomach-pregnant-incr', .5), ('stomach/stomach-tone-decr', .6)],
+    'belly_flat': [('stomach/stomach-pregnant-decr', .6), ('stomach/stomach-tone-incr', .4)],
     'hips_wide': [('hip/hip-scale-horiz-incr', 1)],
     'hips_narrow': [('hip/hip-scale-horiz-decr', 1)],
     # Rosto
@@ -147,13 +151,15 @@ def required_targets():
                 names.add(f'expression/units/{e}/{u}')
     for e in ETHNIC:
         for s in ('male', 'female'):
-            names.add(f'macrodetails/{e}-{s}-young')
+            for a in ('young', 'child'):
+                names.add(f'macrodetails/{e}-{s}-{a}')
     for s in ('male', 'female'):
-        for m in ('minmuscle', 'averagemuscle', 'maxmuscle'):
-            for w in ('minweight', 'averageweight', 'maxweight'):
-                names.add(f'macrodetails/universal-{s}-young-{m}-{w}')
-                for h in ('maxheight', 'minheight'):
-                    names.add(f'macrodetails/height/{s}-young-{m}-{w}-{h}')
-                for p in ('idealproportions', 'uncommonproportions'):
-                    names.add(f'macrodetails/proportions/{s}-young-{m}-{w}-{p}')
+        for a in ('young', 'child'):
+            for m in ('minmuscle', 'averagemuscle', 'maxmuscle'):
+                for w in ('minweight', 'averageweight', 'maxweight'):
+                    names.add(f'macrodetails/universal-{s}-{a}-{m}-{w}')
+                    for h in ('maxheight', 'minheight'):
+                        names.add(f'macrodetails/height/{s}-{a}-{m}-{w}-{h}')
+                    for p in ('idealproportions', 'uncommonproportions'):
+                        names.add(f'macrodetails/proportions/{s}-{a}-{m}-{w}-{p}')
     return sorted(names)

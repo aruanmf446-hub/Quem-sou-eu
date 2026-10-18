@@ -22,7 +22,7 @@ Tudo o mais é original do projeto, gerado proceduralmente: texturas de pele, ol
 
 ## Arquitetura
 
-- `mh.py`, `model.py`: corpo-base (adulto atlético) a partir dos macros do MakeHuman, 80 morphs nomeados (corpo, rosto, traços de personagem, expressões), deltas das juntas por morph e pesos do rig Mixamo (52 ossos + olhos).
+- `mh.py`, `model.py`: corpo-base (adulto atlético) a partir dos macros do MakeHuman, 84 morphs nomeados (corpo adulto e infantil, barriga, rosto, traços de personagem, expressões), deltas das juntas por morph e pesos do rig Mixamo (52 ossos + olhos).
 - `build_base.py`: `base.glb` com o corpo dividido em regiões ocultáveis (`chest`, `belly`, `thigh_a`…), olhos, cílios, dentes, roupa íntima neutra e o esqueleto.
 - `items.py`: amarra qualquer geometria ao corpo (vértice de origem ou baricêntricas) e transfere pesos e morphs. Não há rig manual por peça nem por jogador.
 - `garments.py`, `cloth.py`: roupas derivadas da anatomia (folga, alisamento, caimento, barras retas, golas/punhos, espessura) e texturas PBR por projeção triplanar.

@@ -34,6 +34,10 @@ class AvatarModel:
             self.morphs[name] = mh.macro_delta(self.targets, **params) - mh.macro_delta(self.targets, **reference)
             if name == 'body_feminine':
                 self.morphs[name] -= athletic * .8
+            if name == 'body_child_m':
+                self.morphs[name] -= athletic * .9
+            if name == 'body_child_f':
+                self.morphs[name] -= athletic * .2
         for name, parts in spec.TARGET_MORPHS.items():
             d = np.zeros((n, 3))
             for target, w in parts:

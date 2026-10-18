@@ -75,6 +75,7 @@ export class Avatar {
   /** Recebe o deslocamento do quadril das animações; aplicado ao osso Hips a cada quadro. */
   readonly motion = new THREE.Object3D();
   private hipsBase = new THREE.Vector3();
+  private legScale = 1;
   readonly model: THREE.Object3D;
   readonly bones = new Map<string, THREE.Bone>();
   readonly mixer: THREE.AnimationMixer;
@@ -228,6 +229,11 @@ export class Avatar {
     }
     this.groundOffset = -ground;
     this.hipsBase.copy(this.bones.get('Hips')!.position);
+    // As danças são resolvidas no esqueleto-padrão: o quadril desce e balança proporcionalmente à perna
+    // deste avatar. Sem isso, pernas curtas (baixinhos, crianças) dobram o joelho demais na mesma descida.
+    const len = (map: (n: string) => THREE.Vector3) => ['Left', 'Right'].reduce((a, s) => a + map(`${s}Leg`).length() + map(`${s}Foot`).length(), 0);
+    const restLen = len(n => this.restLocal.get(n) ?? new THREE.Vector3());
+    this.legScale = restLen > 0 ? len(n => this.bones.get(n)?.position ?? new THREE.Vector3()) / restLen : 1;
     this.placeOnGround();
   }
 
@@ -394,7 +400,7 @@ export class Avatar {
   update(dt: number) {
     this.mixer.update(dt);
     const hips = this.bones.get('Hips');
-    if (hips) hips.position.copy(this.hipsBase).add(this.motion.position);
+    if (hips) hips.position.copy(this.motion.position).multiplyScalar(this.legScale).add(this.hipsBase);
     // Objeto na mão: os dedos seguram o cabo durante qualquer dança.
     for (const item of this.equipped.values()) {
       if (!item.grip) continue;

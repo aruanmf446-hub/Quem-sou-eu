@@ -29,20 +29,20 @@ export const IDLE: Choreography = {
 
 // No embalo: passo-toque lateral com balanço de braços e quique.
 const grooveA: Pose = {
-  hips: [.035, -.03, 0], hipsRot: [0, 6, 3], chest: [2, 8, -2], head: [5, 6, -3],
-  legL: { foot: [-.05, 0, 0], footRot: [0, 10, 0] }, legR: { foot: [-.13, .025, .03], footRot: [18, -5, 0] },
+  hips: [.03, -.012, 0], hipsRot: [0, 6, 3], chest: [2, 8, -2], head: [5, 6, -3],
+  legL: { foot: [-.05, 0, 0], footRot: [0, 10, 0] }, legR: { foot: [-.12, .02, .015], footRot: [14, -5, 0] },
   armL: arm(22, 35, 85, { hand: 'fist', twist: 20 }), armR: arm(18, -15, 55, { fist: .4 }),
   face: { smile: .55, squint: .15 },
 };
 const grooveMid: Pose = {
-  hips: [0, -.008, 0], hipsRot: [0, 0, 0], chest: [0, 0, 0], head: [-2, 0, 0],
+  hips: [0, -.004, 0], hipsRot: [0, 0, 0], chest: [0, 0, 0], head: [-2, 0, 0],
   legL: stance(-.06), legR: stance(-.06), armL: arm(16, 10, 60, { fist: .4 }), armR: arm(16, 10, 60, { fist: .4 }),
   face: { smile: .45 },
 };
 export const GROOVE: Choreography = {
   id: 'groove', bpm: 112, beats: 4, loop: true,
   keys: [[0, grooveA], [1, grooveMid], [2, mirror(grooveA)], [3, grooveMid], [4, grooveA]],
-  groove: bounce(.012, .5),
+  groove: bounce(.007, .5),
 };
 
 // Passinho do craque: pés rápidos em giro, joelho alto e braços de corrida.

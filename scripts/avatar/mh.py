@@ -93,7 +93,7 @@ ETHNIC = ('african', 'asian', 'caucasian')
 
 
 def macro_delta(t: TargetCache, gender: float, muscle: float = .5, weight: float = .5,
-                height: float = .5, proportions: float = .5, ethnic=(1/3, 1/3, 1/3)) -> np.ndarray:
+                height: float = .5, proportions: float = .5, ethnic=(1/3, 1/3, 1/3), age: float = 1.0) -> np.ndarray:
     """Avalia os macro-modificadores do MakeHuman para um adulto jovem.
 
     Implementação própria das regras públicas do macro.json: cada eixo é uma
@@ -108,28 +108,33 @@ def macro_delta(t: TargetCache, gender: float, muscle: float = .5, weight: float
 
     m = axis(muscle, 'minmuscle', 'averagemuscle', 'maxmuscle')
     w = axis(weight, 'minweight', 'averageweight', 'maxweight')
+    # Idade: 1 = adulto jovem, 0 = criança (interpolação linear entre os dois conjuntos de alvos).
+    ages = [(a, aw) for a, aw in (('young', age), ('child', 1 - age)) if aw > 0]
     out = np.zeros((t.count, 3))
-    for race, rw in zip(ETHNIC, ethnic):
+    for a, aw in ages:
+        for race, rw in zip(ETHNIC, ethnic):
+            for sex, sw in g.items():
+                if rw * sw > 0:
+                    out += t(f'macrodetails/{race}-{sex}-{a}') * rw * sw * aw
         for sex, sw in g.items():
-            if rw * sw > 0:
-                out += t(f'macrodetails/{race}-{sex}-young') * rw * sw
-    for sex, sw in g.items():
-        for mk, mw in m.items():
-            for wk, ww in w.items():
-                k = sw * mw * ww
-                if k <= 0:
-                    continue
-                out += t(f'macrodetails/universal-{sex}-young-{mk}-{wk}') * k
-                if height != .5:
-                    side = 'maxheight' if height > .5 else 'minheight'
-                    out += t(f'macrodetails/height/{sex}-young-{mk}-{wk}-{side}') * k * abs(height - .5) * 2
-                if proportions != .5:
-                    side = 'idealproportions' if proportions > .5 else 'uncommonproportions'
-                    out += t(f'macrodetails/proportions/{sex}-young-{mk}-{wk}-{side}') * k * abs(proportions - .5) * 2
-                if sex == 'female':
-                    name = f'breast/female-young-{mk}-{wk}-averagecup-averagefirmness'
-                    if t.has(name):
-                        out += t(name) * k
+            for mk, mw in m.items():
+                for wk, ww in w.items():
+                    k = sw * mw * ww * aw
+                    if k <= 0:
+                        continue
+                    out += t(f'macrodetails/universal-{sex}-{a}-{mk}-{wk}') * k
+                    if height != .5:
+                        side = 'maxheight' if height > .5 else 'minheight'
+                        out += t(f'macrodetails/height/{sex}-{a}-{mk}-{wk}-{side}') * k * abs(height - .5) * 2
+                    if proportions != .5:
+                        side = 'idealproportions' if proportions > .5 else 'uncommonproportions'
+                        name = f'macrodetails/proportions/{sex}-{a}-{mk}-{wk}-{side}'
+                        if t.has(name):
+                            out += t(name) * k * abs(proportions - .5) * 2
+                    if sex == 'female':
+                        name = f'breast/female-{a}-{mk}-{wk}-averagecup-averagefirmness'
+                        if t.has(name):
+                            out += t(name) * k
     return out
 
 

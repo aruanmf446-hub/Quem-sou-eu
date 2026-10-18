@@ -10,6 +10,10 @@ export interface BodyShape {
   hips: number;
   legs: number;
   head: number;
+  /** Barriga: -1 chapada .. 1 redonda. */
+  belly: number;
+  /** 0 = adulto, 1 = criança (proporções infantis: baixo, cabeça maior, membros curtos). */
+  child: number;
   /** 0 = realista, 1 = estilo animação (cabeça e olhos maiores). */
   style: number;
 }
@@ -70,7 +74,7 @@ export interface AvatarConfig {
   celebration: string;
 }
 
-export const DEFAULT_BODY: BodyShape = { type: 0, height: 0, muscle: 0, weight: 0, shoulders: 0, torso: 0, hips: 0, legs: 0, head: 0, style: 0 };
+export const DEFAULT_BODY: BodyShape = { type: 0, height: 0, muscle: 0, weight: 0, shoulders: 0, torso: 0, hips: 0, legs: 0, head: 0, belly: 0, child: 0, style: 0 };
 export const DEFAULT_FACE: FaceConfig = {
   shape: 'natural', shapeAmount: .6, width: 0, jaw: 0, chin: 0, cheekbones: 0, eyeSize: 0, eyeDistance: 0, eyeTilt: 0,
   noseWidth: 0, noseLength: 0, noseTip: 0, lips: 0, mouthWidth: 0, browHeight: 0, browAngle: 0, ears: 0, earShape: 0,
@@ -109,6 +113,9 @@ export function morphInfluences(config: Pick<AvatarConfig, 'body' | 'face'>): Re
   pair(clamp(b.hips), 'hips_wide', 'hips_narrow', out);
   pair(clamp(b.legs), 'legs_long', 'legs_short', out, .8);
   pair(clamp(b.head), 'head_big', 'head_small', out);
+  pair(clamp(b.belly ?? 0), 'belly_round', 'belly_flat', out);
+  const child = clamp(b.child ?? 0, 0, 1);
+  if (child > 0) { out.body_child_m = child * (1 - fem); out.body_child_f = child * fem; }
   if (b.style > 0) out.style_toon = clamp(b.style, 0, 1);
   if (f.shape !== 'natural') out[`face_${f.shape}`] = clamp(f.shapeAmount, 0, 1);
   pair(clamp(f.width), 'face_wide', 'face_narrow', out);
@@ -144,7 +151,7 @@ function numbers<T extends object>(defaults: T, raw: unknown): T {
   if (raw && typeof raw === 'object') {
     for (const [k, v] of Object.entries(defaults)) {
       const r = (raw as Record<string, unknown>)[k];
-      if (typeof v === 'number' && typeof r === 'number' && Number.isFinite(r)) out[k] = clamp(r, k === 'type' || k === 'style' || k === 'shapeAmount' || k === 'earShape' || k === 'smile' || k === 'squint' ? 0 : -1, 1);
+      if (typeof v === 'number' && typeof r === 'number' && Number.isFinite(r)) out[k] = clamp(r, k === 'type' || k === 'style' || k === 'child' || k === 'shapeAmount' || k === 'earShape' || k === 'smile' || k === 'squint' ? 0 : -1, 1);
       if (typeof v === 'string' && typeof r === 'string') out[k] = r;
     }
   }
