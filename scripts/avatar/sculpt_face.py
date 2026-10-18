@@ -54,7 +54,7 @@ def cinematic_delta(model):
     # 1. Silhueta: crânio largo/arredondado, testa suavemente projetada.
     #    O topo permanece alto; o terço inferior é comprimido em torno dos olhos.
     skull = head * upper
-    d[:, 0] += x * (.14 * skull)
+    d[:, 0] += x * (.11 * skull)
     d[:, 2] += (z - (ez - .075 * unit)) * (.085 * skull)
     lower = head * (1 - smooth(ey - .018 * unit, ey + .023 * unit, y))
     d[:, 1] += np.maximum(ey - y, 0.) * .22 * lower
@@ -65,21 +65,21 @@ def cinematic_delta(model):
         cx = side * ex
         orbital = gaussian(x, cx, .059 * unit, y, ey, .050 * unit,
                            z, ez, .105 * unit) * head
-        d[:, 0] += (x - cx) * .23 * orbital
-        d[:, 1] += (y - ey) * .31 * orbital
+        d[:, 0] += (x - cx) * .06 * orbital
+        d[:, 1] += (y - ey) * .09 * orbital
 
         # Arcada e pálpebras são saliências em geometria, não maquiagem plana.
         arc = gaussian(x, side * ex * .99, .050 * unit,
                        y, ey + .033 * unit, .024 * unit)
         lid_up = gaussian(x, cx, .050 * unit, y, ey + .015 * unit, .012 * unit)
         lid_low = gaussian(x, cx, .048 * unit, y, ey - .019 * unit, .013 * unit)
-        d[:, 2] += face * unit * (.0085 * arc + .0050 * lid_up + .0030 * lid_low)
+        d[:, 2] += face * unit * (.0050 * arc + .0027 * lid_up + .0015 * lid_low)
 
         # Maçãs do rosto: massas arredondadas sob as órbitas.
         apple = gaussian(x, side * ex * 1.04, .055 * unit,
                          y, ey - .058 * unit, .054 * unit,
                          z, ez + .012 * unit, .095 * unit)
-        d[:, 2] += .018 * unit * apple * face
+        d[:, 2] += .015 * unit * apple * face
         d[:, 0] += side * .0045 * unit * apple * face
 
     # 3. Mandíbula curta, menos pontiaguda; transição suave para o pescoço.
