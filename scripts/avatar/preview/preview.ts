@@ -63,5 +63,6 @@ const config: AvatarConfig = {
   stage.render(0);
   stage.render(0);
   (window as any).__avatar = avatar;
+  (window as any).__stage = stage;
   (window as any).__ready = true;
 })().catch(e => { document.body.textContent = String(e.stack ?? e); (window as any).__ready = 'error'; });

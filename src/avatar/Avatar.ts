@@ -24,15 +24,22 @@ function gripPose(kind: 'fist' | 'staff' | 'open', side: 'Right' | 'Left', base:
   return g;
 }
 const compiled = new Map<string, CompiledClip>();
-/** Clip compartilhado por todos os avatares (compilado uma vez no esqueleto-padrão). */
-export function getClip(id: string, base: GLTF): CompiledClip | null {
+const MAX_CLIPS = 64;
+/**
+ * Clip da coreografia resolvido nas proporções de um esqueleto. Avatares com as mesmas
+ * proporções compartilham o clip; a coreografia (poses-chave) é sempre a mesma.
+ */
+export function getClip(id: string, base: GLTF, rest?: RestSkeleton): CompiledClip | null {
   const choreo = CHOREOGRAPHIES[id];
   if (!choreo) return null;
-  let c = compiled.get(id);
+  restSkeleton ??= new RestSkeleton(base.scene);
+  const skeleton = rest ?? restSkeleton;
+  const key = `${id}|${skeleton === restSkeleton ? 'base' : skeleton.signature()}`;
+  let c = compiled.get(key);
   if (!c) {
-    restSkeleton ??= new RestSkeleton(base.scene);
-    c = compile(choreo, restSkeleton);
-    compiled.set(id, c);
+    c = compile(choreo, skeleton, 30, restSkeleton.legLength());
+    if (compiled.size >= MAX_CLIPS) compiled.delete(compiled.keys().next().value!);
+    compiled.set(key, c);
   }
   return c;
 }
@@ -75,7 +82,9 @@ export class Avatar {
   /** Recebe o deslocamento do quadril das animações; aplicado ao osso Hips a cada quadro. */
   readonly motion = new THREE.Object3D();
   private hipsBase = new THREE.Vector3();
-  private legScale = 1;
+  /** Esqueleto de repouso nas proporções atuais (as danças são resolvidas nele). */
+  private skeletonRest: RestSkeleton | null = null;
+  private retargetIn = -1;
   readonly model: THREE.Object3D;
   readonly bones = new Map<string, THREE.Bone>();
   readonly mixer: THREE.AnimationMixer;
@@ -229,11 +238,13 @@ export class Avatar {
     }
     this.groundOffset = -ground;
     this.hipsBase.copy(this.bones.get('Hips')!.position);
-    // As danças são resolvidas no esqueleto-padrão: o quadril desce e balança proporcionalmente à perna
-    // deste avatar. Sem isso, pernas curtas (baixinhos, crianças) dobram o joelho demais na mesma descida.
-    const len = (map: (n: string) => THREE.Vector3) => ['Left', 'Right'].reduce((a, s) => a + map(`${s}Leg`).length() + map(`${s}Foot`).length(), 0);
-    const restLen = len(n => this.restLocal.get(n) ?? new THREE.Vector3());
-    this.legScale = restLen > 0 ? len(n => this.bones.get(n)?.position ?? new THREE.Vector3()) / restLen : 1;
+    // Esqueleto de repouso desta proporção (rotações identidade, referencial do modelo).
+    for (const bone of this.bones.values()) bone.quaternion.identity();
+    this.model.updateMatrixWorld(true);
+    this.skeletonRest = new RestSkeleton(this.model, this.model);
+    for (const [name, bone] of this.bones) bone.quaternion.copy(saved.get(name)!);
+    // A dança em curso é refeita para o novo corpo (com pequeno atraso enquanto o slider é arrastado).
+    if (this.current) this.retargetIn = .12;
     this.placeOnGround();
   }
 
@@ -371,7 +382,7 @@ export class Avatar {
   /** Toca uma dança/comemoração com transição suave. */
   play(id: string, fade = .35) {
     if (this.current?.id === id) return;
-    const compiledClip = getClip(id, this.base);
+    const compiledClip = getClip(id, this.base, this.skeletonRest ?? undefined);
     if (!compiledClip) return;
     const action = this.mixer.clipAction(compiledClip.clip);
     action.reset().setLoop(THREE.LoopRepeat, Infinity).play();
@@ -382,6 +393,22 @@ export class Avatar {
     this.current = { id, action, face: compiledClip.face };
   }
 
+  /** Troca o clip em curso pelo resolvido nas proporções atuais, mantendo o tempo da dança. */
+  private retarget() {
+    this.retargetIn = -1;
+    const cur = this.current;
+    if (!cur) return;
+    const next = getClip(cur.id, this.base, this.skeletonRest ?? undefined);
+    if (!next || next.clip === cur.action.getClip()) return;
+    const action = this.mixer.clipAction(next.clip);
+    action.reset().setLoop(THREE.LoopRepeat, Infinity).play();
+    action.time = cur.action.time;
+    action.setEffectiveWeight(cur.action.getEffectiveWeight());
+    for (const f of [cur, ...this.fading]) { f.action.stop(); this.mixer.uncacheAction(f.action.getClip()); }
+    this.fading = [];
+    this.current = { id: cur.id, action, face: next.face };
+  }
+
   get playing() { return this.current?.id ?? null; }
 
   set speed(v: number) { this.mixer.timeScale = v; }
@@ -389,6 +416,7 @@ export class Avatar {
   /** Pose fixa num instante (prévias e miniaturas). */
   seek(id: string, time: number) {
     this.play(id, 0);
+    if (this.retargetIn >= 0) this.retarget();
     this.mixer.update(0);
     if (this.current) { this.current.action.time = time; this.current.action.setEffectiveWeight(1); }
     this.fading.forEach(f => f.action.stop());
@@ -398,9 +426,10 @@ export class Avatar {
 
   /** Avança animação, piscadas e olhar. */
   update(dt: number) {
+    if (this.retargetIn >= 0 && (this.retargetIn -= dt) <= 0) this.retarget();
     this.mixer.update(dt);
     const hips = this.bones.get('Hips');
-    if (hips) hips.position.copy(this.motion.position).multiplyScalar(this.legScale).add(this.hipsBase);
+    if (hips) hips.position.copy(this.motion.position).add(this.hipsBase);
     // Objeto na mão: os dedos seguram o cabo durante qualquer dança.
     for (const item of this.equipped.values()) {
       if (!item.grip) continue;
@@ -446,7 +475,19 @@ export class Avatar {
     const head = this.bones.get('Head');
     if (!head) return 1.7;
     this.root.updateMatrixWorld(true);
-    return head.getWorldPosition(new THREE.Vector3()).y - this.root.position.y + .2;
+    let top = head.getWorldPosition(new THREE.Vector3()).y + .2;
+    // Cabelos altos e chapéus entram no enquadramento.
+    for (const slot of ['hair', 'headwear']) {
+      for (const mesh of this.equipped.get(slot)?.meshes ?? []) {
+        if (!mesh.visible) continue;
+        const m = mesh as THREE.SkinnedMesh;
+        if (m.isSkinnedMesh) m.computeBoundingBox();
+        else m.geometry.computeBoundingBox();
+        const box = (m.isSkinnedMesh ? m.boundingBox : m.geometry.boundingBox)?.clone().applyMatrix4(m.matrixWorld);
+        if (box && Number.isFinite(box.max.y)) top = Math.max(top, Math.min(box.max.y + .04, top + .45));
+      }
+    }
+    return top - this.root.position.y;
   }
 
   dispose() {

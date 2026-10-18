@@ -248,7 +248,6 @@ export function AvatarStudio({ onPlay }: { onPlay?: () => void }) {
         onReady={h => { view.current = h; }} onLoading={setLoading} />
       <header className="as-stage-top">
         <div><span className="as-kicker">ESTÚDIO 3D</span><strong>Crie. Vista. Dance.</strong></div>
-        {loading.length > 0 && <span className="as-loading-pill" role="status"><i />Vestindo {loading.length} {loading.length > 1 ? 'peças' : 'peça'}</span>}
       </header>
       <nav className="as-camera" aria-label="Câmera">
         {([['full', 'body', 'Corpo inteiro'], ['face', 'face', 'Rosto'], ['torso', 'torso', 'Tronco'], ['legs', 'legs', 'Pernas'], ['feet', 'feet', 'Pés'], ['back', 'back', 'Costas']] as const).map(([f, icon, l]) =>

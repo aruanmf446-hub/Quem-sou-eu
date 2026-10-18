@@ -136,8 +136,22 @@ describe('montagem, proporções e animações', () => {
     const duration = CHOREOGRAPHIES[id].beats * 60 / CHOREOGRAPHIES[id].bpm;
     for (const t of [0, duration * .27, duration * .61]) {
       a.seek(id, t); b.seek(id, t);
-      for (const name of ['LeftArm', 'RightForeArm', 'Spine1', 'LeftUpLeg', 'RightLeg', 'Head']) {
-        expect(a.bones.get(name)!.quaternion.angleTo(b.bones.get(name)!.quaternion)).toBeLessThan(2e-3);
+      // Tronco e cabeça: mesma rotação; braços: mesma direção (ajuste de poucos graus às proporções).
+      for (const name of ['Spine1', 'Head']) expect(a.bones.get(name)!.quaternion.angleTo(b.bones.get(name)!.quaternion)).toBeLessThan(2e-3);
+      const dir = (av: Avatar, from: string, to: string) => {
+        av.root.updateMatrixWorld(true);
+        return av.bones.get(to)!.getWorldPosition(new THREE.Vector3()).sub(av.bones.get(from)!.getWorldPosition(new THREE.Vector3())).normalize();
+      };
+      for (const [from, to] of [['LeftArm', 'LeftForeArm'], ['RightForeArm', 'RightHand']]) expect(dir(a, from, to).angleTo(dir(b, from, to))).toBeLessThan(.05);
+      // Pernas resolvidas nas proporções de cada corpo: joelho sempre à frente e pé no chão.
+      for (const av of [a, b]) {
+        av.root.updateMatrixWorld(true);
+        for (const side of ['Left', 'Right']) {
+          const [hip, knee, ankle] = ['UpLeg', 'Leg', 'Foot'].map(n => av.bones.get(side + n)!.getWorldPosition(new THREE.Vector3()));
+          const u = (knee.y - hip.y) / (ankle.y - hip.y);
+          expect(knee.z - (hip.z + (ankle.z - hip.z) * u)).toBeGreaterThan(-.005);
+          expect(ankle.y).toBeGreaterThan(id === 'jump' ? .03 : .05);
+        }
       }
       const box = skinnedBounds(a);
       expect(box.getSize(new THREE.Vector3()).y).toBeGreaterThan(1.1);
