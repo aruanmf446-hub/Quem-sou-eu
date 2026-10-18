@@ -3,7 +3,7 @@ import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { morphInfluences, restExpression, type AvatarConfig } from './config';
-import { applyHairTips, makeSkinMaterial, skinToneColors, type SkinUniforms } from './materials';
+import { applyHairTips, makeSkinMaterial, skinToneColors, stylize, type SkinUniforms } from './materials';
 import { compile, PoseSolver, RestSkeleton, sampleFace, type CompiledClip } from './animation';
 import { CHOREOGRAPHIES } from './dances';
 import { versioned } from './catalog';
@@ -169,6 +169,9 @@ export class Avatar {
           mesh.castShadow = false;
           this.addTint('lashes', mesh.material as THREE.MeshStandardMaterial);
         }
+        // Acabamento de animação (olhos, córnea e camadas transparentes ficam de fora).
+        const final = mesh.material as THREE.Material;
+        if (!final.transparent && !final.userData.irisColor) stylize(final);
         this.parts.push({ mesh });
         const region = mesh.userData.region as string | undefined;
         if (region) {
@@ -326,6 +329,7 @@ export class Avatar {
       }
       if (material.userData.overlay) { material.polygonOffset = true; material.polygonOffsetFactor = -2; material.polygonOffsetUnits = -2; mesh.renderOrder = 1; }
       if (material.transparent) { material.depthWrite = false; mesh.castShadow = false; }
+      else stylize(material);
       mesh.position.set(0, 0, 0);
       mesh.quaternion.identity();
       mesh.scale.set(1, 1, 1);

@@ -1,14 +1,19 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { TOON } from './materials';
 
 export type StageMood = 'studio' | 'arena' | 'midnight';
 export type CameraFocus = 'full' | 'face' | 'eye' | 'torso' | 'legs' | 'feet' | 'back';
 
 const MOODS: Record<StageMood, { key: string; fill: string; rim: string; floor: string; accent: string; exposure: number; bg: string }> = {
-  studio: { key: '#fff3e6', fill: '#b8d2ff', rim: '#d9d2ff', floor: '#1b2130', accent: '#c6ff6a', exposure: 1.0, bg: '#141924' },
-  arena: { key: '#f4fbff', fill: '#7fe7c6', rim: '#52f2c8', floor: '#0f2622', accent: '#5dffc5', exposure: 1.05, bg: '#0b1d1a' },
-  midnight: { key: '#ffe6f0', fill: '#7d85ff', rim: '#ff4f7a', floor: '#1d1426', accent: '#ff5b77', exposure: .95, bg: '#140d1c' },
+  studio: { key: '#ffe7cf', fill: '#9fbcff', rim: '#a9b8ff', floor: '#1b2130', accent: '#c6ff6a', exposure: 1.0, bg: '#141924' },
+  arena: { key: '#fff2de', fill: '#7fe7c6', rim: '#52f2c8', floor: '#0f2622', accent: '#5dffc5', exposure: 1.05, bg: '#0b1d1a' },
+  midnight: { key: '#ffe6f0', fill: '#7d85ff', rim: '#ff6f92', floor: '#1d1426', accent: '#ff5b77', exposure: .98, bg: '#140d1c' },
 };
 
 /** Palco 3D reutilizável: estúdio, lobby e prévias usam a mesma luz e câmera. */
@@ -17,11 +22,12 @@ export class AvatarStage {
   readonly scene = new THREE.Scene();
   readonly camera = new THREE.PerspectiveCamera(28, 1, .05, 60);
   readonly controls: OrbitControls;
-  private key = new THREE.DirectionalLight('#ffffff', 3.6);
-  private fill = new THREE.DirectionalLight('#ffffff', .75);
-  private rim = new THREE.DirectionalLight('#ffffff', 2.4);
-  private rim2 = new THREE.DirectionalLight('#ffffff', 1.2);
-  private hemi = new THREE.HemisphereLight('#dfe8ff', '#2a2420', .35);
+  // Luz de cinema de animação: chave quente e forte, preenchimento frio e baixo, dois recortes coloridos por trás.
+  private key = new THREE.DirectionalLight('#ffffff', 3.0);
+  private fill = new THREE.DirectionalLight('#ffffff', .5);
+  private rim = new THREE.DirectionalLight('#ffffff', 2.6);
+  private rim2 = new THREE.DirectionalLight('#ffffff', 1.6);
+  private hemi = new THREE.HemisphereLight('#dfe8ff', '#2a2420', .4);
   private floorMat = new THREE.MeshStandardMaterial({ color: '#1b2130', roughness: .42, metalness: .35 });
   private ringMat = new THREE.MeshBasicMaterial({ color: '#c6ff6a' });
   private envMap: THREE.Texture;
@@ -30,7 +36,9 @@ export class AvatarStage {
   height = 1.8;
   private currentFocus: CameraFocus = 'full';
 
-  constructor(canvasHost: HTMLElement, opts: { transparent?: boolean; controls?: boolean; pixelRatio?: number; background?: string } = {}) {
+  private composer: EffectComposer | null = null;
+
+  constructor(canvasHost: HTMLElement, opts: { transparent?: boolean; controls?: boolean; pixelRatio?: number; background?: string; effects?: boolean } = {}) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: !!opts.transparent, powerPreference: 'high-performance', preserveDrawingBuffer: false });
     const coarse = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
     // Celulares: resolução e sombra um pouco menores para manter a fluidez das danças.
@@ -41,6 +49,21 @@ export class AvatarStage {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     canvasHost.prepend(this.renderer.domElement);
+    // Oclusão de ambiente em tela (dobras, encaixes, axilas, sob o chapéu), como nas artes de animação.
+    // Fica de fora no celular para manter a fluidez das danças.
+    if (opts.effects ?? !coarse) {
+      try {
+        const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
+        this.composer = new EffectComposer(this.renderer, target);
+        this.composer.addPass(new RenderPass(this.scene, this.camera));
+        const gtao = new GTAOPass(this.scene, this.camera, 1, 1);
+        gtao.blendIntensity = .85;
+        gtao.updateGtaoMaterial({ radius: .14, distanceExponent: 1.4, thickness: 1.2, scale: 1.15, samples: 16, distanceFallOff: 1, screenSpaceRadius: false });
+        gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 });
+        this.composer.addPass(gtao);
+        this.composer.addPass(new OutputPass());
+      } catch { this.composer = null; }
+    }
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     const room = new RoomEnvironment();
     this.envMap = pmrem.fromScene(room, .035).texture;
@@ -48,15 +71,15 @@ export class AvatarStage {
     pmrem.dispose();
     this.scene.environment = this.envMap;
     if (opts.background) this.scene.background = new THREE.Color(opts.background);
-    this.scene.environmentIntensity = .45;
-    this.key.position.set(1.8, 3.6, 3.8);
+    this.scene.environmentIntensity = .32;
+    this.key.position.set(3.0, 3.4, 2.6);
     this.key.castShadow = true;
     this.key.shadow.mapSize.setScalar(coarse ? 1024 : 2048);
     Object.assign(this.key.shadow.camera, { left: -1.4, right: 1.4, top: 2.4, bottom: -.4, near: .5, far: 12 });
     this.key.shadow.bias = -.0004;
     this.key.shadow.normalBias = .015;
     this.key.shadow.radius = 5;
-    this.fill.position.set(-3.5, 2, 2.5);
+    this.fill.position.set(-3.2, 1.2, 3.0);
     this.rim.position.set(-2.2, 3.2, -3.4);
     this.rim2.position.set(2.6, 1.8, -2.8);
     this.scene.add(this.key, this.key.target, this.fill, this.rim, this.rim2, this.hemi);
@@ -121,6 +144,7 @@ export class AvatarStage {
     this.floorMat.color.set(m.floor);
     this.ringMat.color.set(m.accent);
     this.renderer.toneMappingExposure = m.exposure;
+    TOON.rimColor.value.set(m.rim);
   }
 
   focus(view: CameraFocus, instant = false) {
@@ -170,6 +194,7 @@ export class AvatarStage {
   resize(w: number, h: number) {
     if (!w || !h) return;
     this.renderer.setSize(w, h, false);
+    if (this.composer) { this.composer.setPixelRatio(this.renderer.getPixelRatio()); this.composer.setSize(w, h); }
     this.renderer.domElement.style.width = '100%';
     this.renderer.domElement.style.height = '100%';
     this.camera.aspect = w / h;
@@ -203,7 +228,8 @@ export class AvatarStage {
       d.t = this.camera.position.distanceTo(d.pos) < .002 ? 1 : d.t;
     }
     this.controls.update(dt);
-    this.renderer.render(this.scene, this.camera);
+    if (this.composer) this.composer.render(dt);
+    else this.renderer.render(this.scene, this.camera);
   }
 
   dispose() {
@@ -217,6 +243,7 @@ export class AvatarStage {
       }
     });
     this.key.shadow.map?.dispose();
+    this.composer?.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }
