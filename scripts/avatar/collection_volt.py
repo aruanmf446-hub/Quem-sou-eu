@@ -239,36 +239,68 @@ def spiky_hair(model, layout, item_id='hair_spiky'):
         widths.append(H.taper(12, rng.uniform(.02, .026), .6, .5))
     HS.emit(b, 'cap', mat, paths, widths, vol, tip_scale=.2)
 
-    # Espetos largos varridos para trás e para cima (como uma chama).
+    # Escultura de topete: mechas sobrepostas em leques, em vez de
+    # espinhos radiais. Contorno ainda elétrico e azul, mas com massa orgânica.
     paths, widths = [], []
 
-    def spike(el, azd, length, width, sweep=1.0, lift=.0, seed=0):
-        e, a = np.radians(el), np.radians(azd)
-        u = np.array([np.cos(e) * np.sin(a), np.sin(e), np.cos(e) * np.cos(a)])
-        root = c + u * r * .97
-        nrm = u / r
-        nrm /= np.linalg.norm(nrm)
-        d = nrm * .4 + np.array([0, .45 + lift, -1.0]) * sweep
-        path = H.free_path(vol, root, d, length, 14, gravity=-.35, stiff=.95, wave=(.0, 1, 0), margin=.006, seed=seed)
+    def lock(elevation, azimuth, length, width, seed, sweep=.75):
+        e, a = np.radians(elevation), np.radians(azimuth)
+        unit = np.array([np.cos(e) * np.sin(a), np.sin(e),
+                         np.cos(e) * np.cos(a)])
+        root = vol.push_out((c + unit * r * .96)[None, :], .005)[0]
+        # Sobe a partir da testa e vira para trás, com movimentos alternados.
+        direction = unit * .18 + np.array([
+            np.sin(a) * .19,
+            .84 + .16 * np.cos(a * 1.7),
+            -.7 * sweep,
+        ])
+        path = H.free_path(vol, root, direction, length, 19,
+                           gravity=-.16, stiff=.72,
+                           wave=(.0045, .72, seed * 1.31),
+                           margin=.009, seed=seed)
         paths.append(path)
-        widths.append(H.taper(14, width, .06, .05))
+        widths.append(H.taper(19, width, .025, .13))
 
-    k = 0
-    for el, count, a0, a1, ln, wd in ((12, 13, -165, 165, (.08, .11), (.04, .05)),
-                                      (32, 12, -150, 150, (.1, .14), (.045, .056)),
-                                      (52, 9, -130, 130, (.11, .15), (.05, .06)),
-                                      (72, 5, -100, 100, (.11, .14), (.05, .06))):
+    # Camadas largas formam volume; pontas variam sem virar uma coroa de espinhos.
+    layers = [
+        (19, 12, -138, 138, (.10, .145), (.032, .046)),
+        (42, 11, -128, 128, (.135, .185), (.035, .05)),
+        (62, 9, -112, 112, (.14, .19), (.033, .045)),
+        (77, 5, -90, 90, (.115, .155), (.026, .038)),
+    ]
+    seed = 0
+    for el, count, first, last, lengths, sizes in layers:
         for i in range(count):
-            a = a0 + (a1 - a0) * (i + .5 * (el % 2)) / count + rng.uniform(-6, 6)
-            if el < 30 and abs(a) < 70:
-                continue  # rosto: sem espetos baixos na frente
-            spike(el + rng.uniform(-4, 4), a, rng.uniform(*ln), rng.uniform(*wd), seed=k)
-            k += 1
-    # Topete: mechas que sobem da testa e viram para trás.
-    for i in range(6):
-        a = -40 + 80 * i / 5 + rng.uniform(-5, 5)
-        spike(40 + rng.uniform(-3, 3), a, rng.uniform(.12, .16), rng.uniform(.05, .062), sweep=.8, lift=.8, seed=100 + i)
-    HS.emit(b, 'spikes', mat, paths, widths, vol, tip_scale=1, flat=.5)
+            azimuth = first + (last - first) * (i + .5) / count
+            azimuth += rng.uniform(-6, 6)
+            # Não esconder os olhos com mechas frontais de baixa altura.
+            if el < 30 and abs(azimuth) < 60:
+                continue
+            lock(el + rng.uniform(-5, 5), azimuth,
+                 rng.uniform(*lengths), rng.uniform(*sizes), seed,
+                 sweep=.72 + rng.uniform(-.15, .12))
+            seed += 1
+    HS.emit(b, 'locks', mat, paths, widths, vol, tip_scale=.95, flat=.52)
+
+    # Topete frontal em mechas largas separadas: silhueta assimétrica,
+    # pontas curvadas e sobreposição visível mesmo em câmera afastada.
+    paths, widths = [], []
+    for i in range(9):
+        s = -1 + 2 * i / 8
+        root = c + np.array([s * r[0] * .72,
+                              r[1] * (.58 + .10 * (1 - s * s)),
+                              r[2] * (.77 - .13 * abs(s))])
+        root = vol.push_out(root[None, :], .01)[0]
+        direction = np.array([.22 + s * .34, 1.08 - abs(s) * .12, -.40])
+        path = H.free_path(vol, root, direction,
+                           .145 + .024 * (1 - abs(s)) + rng.uniform(-.01, .01),
+                           21, gravity=-.07, stiff=.88,
+                           wave=(.005, .7, i * .71), margin=.012,
+                           seed=100 + i)
+        paths.append(path)
+        widths.append(H.taper(21, .038 + .008 * (1 - abs(s)),
+                               .045, .08))
+    HS.emit(b, 'forelock', mat, paths, widths, vol, tip_scale=1, flat=.40)
 
     # Costeletas: descem rentes à têmpora, na frente da orelha.
     paths, widths = [], []
@@ -361,6 +393,35 @@ def lab_coat(model, layout, item_id='top_lab_coat'):
     a, nm, orm = cloth.finish(bake, np.clip(alb, 0, 1), rough, height, metal=met)
     mat = pbr(b, 'coat', a, nm, orm, sheen=((.3, .3, .32), .6))
     b.derived('coat', s, mat)
+
+    # Frisos metálicos em malha REAL sobre a abertura frontal.
+    # Antes existiam apenas pintados no albedo do jaleco.
+    piping = metal(b, 'gold_piping', GOLD, .27, .88)
+    for side in (-1, 1):
+        path = []
+        for y0 in np.linspace(cut + .035, neck_y - .065, 37):
+            sel = np.flatnonzero(
+                (np.abs(s.ref[:, 1] - y0) < .014)
+                & (np.sign(s.ref[:, 0]) == side)
+                & (np.abs(np.abs(s.ref[:, 0]) - open_w(y0) - .01) < .025)
+                & (s.ref[:, 2] > -.025)
+                & (s.part < .5)
+            )
+            if not len(sel):
+                continue
+            err = (np.abs(np.abs(s.ref[sel, 0]) - open_w(y0) - .01) * 2
+                   + np.abs(s.ref[sel, 1] - y0))
+            v = sel[np.argmin(err)]
+            path.append(s.pos[v] + nn[v] * .004)
+        if len(path) > 9:
+            curve = np.asarray(path)
+            # Suaviza pontos de malha preservando início e fim da costura.
+            for _ in range(2):
+                curve[1:-1] = .25 * curve[:-2] + .5 * curve[1:-1] + .25 * curve[2:]
+            p, n_, uv_, t_, _ = hair.tube_mesh(
+                [curve], [np.full(len(curve), .0026)], sides=8)
+            b.bound(f'gold_piping_{"left" if side < 0 else "right"}',
+                    p, t_, uv_, piping, nrm=n_)
 
     _coat_collar(b, model, A, neck_pts, neck_vid)
     _coat_skirt(b, model, A, hem_pts, open_w(hips_y - .02))
@@ -482,7 +543,7 @@ def _coat_skirt(b, model, A, hem_pts, w_hem):
         if prev is not None:
             rr = np.maximum(rr, prev)
         prev = rr
-        folds = (np.sin(tq * 9 + phase[0]) * .6 + np.sin(tq * 5 + phase[1]) * .4) * .007 * f ** 1.2
+        folds = (np.sin(tq * 9 + phase[0]) * .53 + np.sin(tq * 5 + phase[1]) * .32 + np.sin(tq * 17 + phase[2]) * .15) * .015 * f ** 1.35
         rr = rr + folds
         grid.append(np.stack([np.sin(tq) * rr, yy, cz + np.cos(tq) * rr], 1))
     grid = np.array(grid)
