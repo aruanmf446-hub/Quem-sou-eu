@@ -34,6 +34,8 @@ export class AvatarStage {
   private props: THREE.Object3D[] = [];
   private destination = { pos: new THREE.Vector3(0, 1.1, 5), target: new THREE.Vector3(0, 1, 0), t: 1 };
   height = 1.8;
+  /** Altura do centro do rosto (osso Head), independente do topete ou chapéu. */
+  faceCenterY = 1.57;
   private currentFocus: CameraFocus = 'full';
 
   private composer: EffectComposer | null = null;
@@ -159,8 +161,10 @@ export class AvatarStage {
     const frames: Record<CameraFocus, [number, number, number]> = {
       full: [h * .57, h * .54, fullDistance],
       back: [h * .57, h * .54, fullDistance],
-      face: [h * .925, h * .925, 1.0],
-      eye: [h * .94, h * .94, .22],
+      // O valor h inclui cabelo alto: NÃO o use para centralizar o rosto.
+      // Distância suficiente para enquadrar sobrancelhas, olhos, nariz e boca.
+      face: [this.faceCenterY, this.faceCenterY, 1.47],
+      eye: [this.faceCenterY + .035, this.faceCenterY + .035, .54],
       torso: [h * .72, h * .7, 1.75],
       legs: [h * .32, h * .3, 2.1],
       feet: [h * .1, h * .06, 1.25],
