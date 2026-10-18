@@ -74,7 +74,7 @@ export interface AvatarConfig {
   celebration: string;
 }
 
-export const DEFAULT_BODY: BodyShape = { type: 0, height: 0, muscle: 0, weight: 0, shoulders: 0, torso: 0, hips: 0, legs: 0, head: 0, belly: 0, child: 0, style: 0 };
+export const DEFAULT_BODY: BodyShape = { type: 0, height: 0, muscle: 0, weight: 0, shoulders: 0, torso: 0, hips: 0, legs: 0, head: 0, belly: 0, child: 0, style: .9 };
 export const DEFAULT_FACE: FaceConfig = {
   shape: 'natural', shapeAmount: .6, width: 0, jaw: 0, chin: 0, cheekbones: 0, eyeSize: 0, eyeDistance: 0, eyeTilt: 0,
   noseWidth: 0, noseLength: 0, noseTip: 0, lips: 0, mouthWidth: 0, browHeight: 0, browAngle: 0, ears: 0, earShape: 0,
