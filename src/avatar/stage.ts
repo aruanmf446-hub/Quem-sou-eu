@@ -153,7 +153,9 @@ export class AvatarStage {
     const h = this.height;
     const d = this.destination;
     const azimuth = view === 'back' ? Math.PI : .18;
-    const fullDistance = Math.max(2.75 * h, h * .65 / (Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2) * this.camera.aspect));
+    // Palco largo: aproxima o herói. Palco estreito mantém margem para dança e acessórios.
+    const fitMultiplier = this.camera.aspect < .8 ? 2.78 : 2.4;
+    const fullDistance = Math.max(fitMultiplier * h, h * .65 / (Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2) * this.camera.aspect));
     const frames: Record<CameraFocus, [number, number, number]> = {
       full: [h * .57, h * .54, fullDistance],
       back: [h * .57, h * .54, fullDistance],
