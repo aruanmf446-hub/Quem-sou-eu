@@ -81,7 +81,7 @@ def build(model, glb, skin_index):
     m_cornea = glb.material('EyeCornea', color=(1, 1, 1, .06), roughness=.02, alpha=('BLEND', 0),
                             clearcoat=(1.0, .02), extras={'cornea': True})
     # Duas variantes: realista e estilo animação (íris maior), escolhidas no runtime pelo estilo.
-    for variant, iris_ratio, mi in (('real', .5, m_iris), ('toon', .68, m_iris_toon)):
+    for variant, iris_ratio, mi in (('real', .5, m_iris), ('toon', .76, m_iris_toon)):
         build_side(model, glb, skin_index, m_sclera, mi, m_cornea, variant, iris_ratio)
 
 
@@ -107,7 +107,7 @@ def build_side(model, glb, skin_index, m_sclera, m_iris, m_cornea, variant, iris
         bulge = np.clip(1 - np.arccos(np.clip(cornea[:, 2] / (radius * 1.015), -1, 1)) / np.radians(48), 0, 1)
         cornea[:, 2] += radius * .07 * bulge ** 2
         # O olho em repouso olha levemente para cima: a pálpebra superior cobre o topo da íris.
-        tilt = np.radians(-2)  # íris centralizada: evita aparência permanentemente sonolenta
+        tilt = np.radians(1)  # direção frontal, sem olhar permanentemente sonolento
         rot = np.array([[1, 0, 0], [0, np.cos(tilt), -np.sin(tilt)], [0, np.sin(tilt), np.cos(tilt)]])
         pos, nrm, cornea = pos @ rot.T, nrm @ rot.T, cornea @ rot.T
         world = pos + c
