@@ -127,5 +127,9 @@ jobs:
           git add public/avatar/base.glb public/avatar/items public/avatar/thumbs src/avatar/assetVersions.json art-direction/volt art-direction/camisa10
           if ! git diff --cached --quiet; then
             git commit -m "Regenerar malhas 3D, miniaturas e provas visuais"
+            # Não sobrescrever commits de código ou provas visuais feitos
+            # enquanto a geração, que é demorada, ainda estava em execução.
+            git fetch origin main
+            git rebase origin/main
             git push origin HEAD:main
           fi
