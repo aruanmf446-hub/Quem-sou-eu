@@ -1,9 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import * as THREE from 'three';
+import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { Avatar, AVATAR_BASE_URL, loadAvatarAsset } from './Avatar';
 import { itemUrl } from './catalog';
 import { SLOTS, type AvatarConfig } from './config';
 import { AvatarStage, type CameraFocus, type StageMood } from './stage';
+import './avatarView.css';
+
+/** Peças já carregadas (para trocar na hora, sem tela de carregamento). */
+const loaded = new Map<string, GLTF>();
 
 export interface AvatarViewHandle {
   stage: AvatarStage;
@@ -44,6 +49,8 @@ export function AvatarView({ config, motion = 'groove', playing = true, speed = 
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [progress, setProgress] = useState(0);
   const [retry, setRetry] = useState(0);
+  /** Troca de visual em andamento (peças baixadas / total). */
+  const [swap, setSwap] = useState<{ done: number; total: number; first: boolean } | null>(null);
 
   useEffect(() => {
     const el = host.current!;
@@ -105,35 +112,57 @@ export function AvatarView({ config, motion = 'groove', playing = true, speed = 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retry, interactive]);
 
-  /** Aplica a configuração: forma, cores e troca apenas as peças que mudaram. */
+  /**
+   * Aplica a configuração de uma vez: primeiro baixa todas as peças novas (o visual atual
+   * continua na tela, com a tela de carregamento por cima) e só então troca corpo, cores e
+   * roupas no mesmo quadro. Assim nunca aparece um personagem misturado com outro.
+   */
   function applyConfig(c: AvatarConfig, first = false) {
     const state = ctx.current;
     const avatar = state?.avatar;
     if (!state || !avatar) return;
-    avatar.setShape(c);
-    avatar.setColors(c);
     const token = ++state.token;
-    const pending: string[] = [];
-    for (const slot of SLOTS) {
-      const id = c.items[slot] ?? null;
-      if (!first && state.applied[slot] === id) continue;
-      state.applied[slot] = id;
-      if (!id) { avatar.equip(slot, null); continue; }
-      pending.push(id);
-      loadAvatarAsset(itemUrl(id)).then(asset => {
-        if (ctx.current !== state || state.applied[slot] !== id) return;
-        avatar.equip(slot, id, asset);
-        avatar.setColors(props.current.config);
-      }).catch(() => {
-        if (state.applied[slot] === id) state.applied[slot] = undefined;
-      }).finally(() => {
-        const i = pending.indexOf(id);
-        if (i >= 0) pending.splice(i, 1);
-        if (token === state.token) onLoading?.([...pending]);
-      });
+    const changed = SLOTS.filter(slot => first || state.applied[slot] !== (c.items[slot] ?? null));
+    const ids = [...new Set(changed.map(slot => c.items[slot]).filter((id): id is string => !!id))];
+    const missing = ids.filter(id => !loaded.has(id));
+    const commit = (assets: Map<string, GLTF | null>) => {
+      if (ctx.current !== state || token !== state.token) return;
+      avatar.setShape(c);
+      for (const slot of changed) {
+        const id = c.items[slot] ?? null;
+        const asset = id ? assets.get(id) : null;
+        state.applied[slot] = id;
+        if (id && !asset) { state.applied[slot] = undefined; avatar.equip(slot, null); continue; }
+        avatar.equip(slot, id, asset ?? undefined);
+      }
+      avatar.setColors(c);
+      // Reenquadra quando a altura do personagem muda (cabelos altos, chapéus, corpos diferentes).
+      const height = Math.max(1.4, avatar.headHeight());
+      const reframe = Math.abs(height - state.stage.height) > .03;
+      state.stage.height = height;
+      if (reframe || first) state.stage.focus(focusRef.current, first);
+      avatar.root.visible = true;
+      setSwap(null);
+      onLoading?.([]);
+    };
+    if (!missing.length) {
+      // Tudo já está na memória: troca imediata (sliders, cores, peças já vistas).
+      commit(new Map(ids.map(id => [id, loaded.get(id)!])));
+      return;
     }
-    onLoading?.([...pending]);
-    state.stage.height = Math.max(1.4, avatar.headHeight());
+    if (first) avatar.root.visible = false;
+    let done = ids.length - missing.length;
+    setSwap({ done, total: ids.length, first });
+    onLoading?.([...missing]);
+    const assets = new Map<string, GLTF | null>();
+    Promise.all(ids.map(id => loadAvatarAsset(itemUrl(id))
+      .then(a => { loaded.set(id, a); assets.set(id, a); }, () => { assets.set(id, null); })
+      .finally(() => {
+        if (token !== state.token || !missing.includes(id)) return;
+        done++;
+        setSwap({ done, total: ids.length, first });
+        onLoading?.(missing.filter(m => !assets.has(m)));
+      }))).then(() => commit(assets));
   }
 
   useEffect(() => { applyConfig(config); }, [config]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -150,8 +179,18 @@ export function AvatarView({ config, motion = 'groove', playing = true, speed = 
     if (status === 'ready') shown.current = true;
   }, [focus, focusKey, status]);
 
-  return <div className={`avatar-view ${status === 'ready' ? 'is-ready' : ''} ${className ?? ''}`} ref={host}>
+  const swapping = status === 'ready' && swap !== null;
+  const pct = swap ? Math.round(swap.done / Math.max(1, swap.total) * 100) : 0;
+  return <div className={`avatar-view ${status === 'ready' ? 'is-ready' : ''} ${swapping ? 'is-swapping' : ''} ${swapping && swap.first ? 'is-first' : ''} ${className ?? ''}`} ref={host}>
     {status === 'loading' && <div className="avatar-view-status" role="status"><span className="avatar-view-spinner" /><b>Preparando seu personagem</b><small>{progress ? `${progress}%` : 'Carregando modelo e materiais…'}</small></div>}
+    {swapping && <div className="avatar-view-swap" role="status" aria-live="polite">
+      <div className="avatar-view-swap-card">
+        <span className="avatar-view-ring" style={{ '--p': pct } as CSSProperties}><em>{pct}%</em></span>
+        <b>{swap.first ? 'Vestindo seu personagem' : 'Trocando o visual'}</b>
+        <small>{swap.done} de {swap.total} {swap.total > 1 ? 'peças prontas' : 'peça pronta'}</small>
+        <i className="avatar-view-bar"><i style={{ width: `${pct}%` }} /></i>
+      </div>
+    </div>}
     {status === 'error' && <div className="avatar-view-status" role="alert"><b>Não foi possível abrir o 3D</b><small>Verifique a conexão e a aceleração gráfica do navegador.</small><button type="button" onClick={() => setRetry(v => v + 1)}>Tentar novamente</button></div>}
   </div>;
 }

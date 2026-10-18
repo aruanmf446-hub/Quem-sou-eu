@@ -30,8 +30,6 @@
 .as-stage-top { position: absolute; top: 18px; left: 22px; right: 22px; display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none; }
 .as-kicker { display: block; font-size: 11px; font-weight: 800; letter-spacing: .22em; color: var(--accent); }
 .as-stage-top strong { display: block; font-family: var(--display); font-weight: 400; font-size: clamp(22px, 2.4vw, 34px); letter-spacing: .02em; line-height: 1.05; margin-top: 4px; text-shadow: 0 2px 18px #0008; }
-.as-loading-pill { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 99px; background: #0009; border: 1px solid var(--line-2); font-size: 12px; font-weight: 800; color: #dfe6f5; backdrop-filter: blur(8px); }
-.as-loading-pill i { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--accent); border-top-color: transparent; animation: as-spin .8s linear infinite; }
 
 .as-camera { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 18px; background: #0b0f19b8; border: 1px solid var(--line); backdrop-filter: blur(12px); }
 .as-camera > span { height: 1px; background: var(--line-2); margin: 3px 4px; }
@@ -173,21 +171,11 @@
 .as-cart-total b { display: inline-flex; gap: 6px; align-items: center; font-family: var(--display); font-weight: 400; font-size: 24px; color: var(--gold); }
 .as-input { width: 100%; padding: 14px; border-radius: 14px; border: 1px solid var(--line-2); background: #0b0f19; color: #fff; font-size: 16px; margin-top: 10px; }
 
-/* Componente 3D */
-.avatar-view { position: relative; width: 100%; height: 100%; touch-action: none; }
-.avatar-view canvas { display: block; width: 100%; height: 100%; outline: none; opacity: 0; transition: opacity .4s; }
-.avatar-view.is-ready canvas { opacity: 1; }
-.avatar-view-status { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 8px; text-align: center; color: #dfe6f5; pointer-events: none; }
-.avatar-view-status b { font-size: 14px; font-weight: 800; }
-.avatar-view-status small { font-size: 12px; color: #9aa6bd; font-weight: 600; }
-.avatar-view-status button { pointer-events: auto; margin-top: 6px; padding: 10px 16px; border-radius: 12px; background: #fff; color: #0b0f19; }
-.avatar-view-spinner { width: 34px; height: 34px; border-radius: 50%; border: 3px solid #ffffff2a; border-top-color: #fff; animation: as-spin .9s linear infinite; }
-
 @keyframes as-spin { to { transform: rotate(360deg); } }
 @keyframes as-in { from { opacity: 0; transform: translateY(6px); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .as-root *, .avatar-view canvas { animation: none !important; transition: none !important; }
+  .as-root * { animation: none !important; transition: none !important; }
 }
 
 /* Celular e tablet em pé */
@@ -220,3 +208,25 @@
 /* Foco visível para teclado */
 .as-root button:focus-visible, .as-root input:focus-visible, .as-root select:focus-visible, .as-swatch-custom:focus-within { outline: 2px solid #fff; outline-offset: 2px; }
 .as-tabs button:focus-visible, .as-item:focus-visible, .as-move:focus-visible, .as-bundle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Reserva espaço real para o cabeçalho e o player: não encobrir pés e mãos. */
+.as-stage .avatar-view {
+  inset: 64px 68px 112px 12px;
+  width: auto;
+  height: auto;
+}
+.as-camera {
+  top: 72px;
+  bottom: 112px;
+  transform: none;
+  max-height: calc(100% - 184px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.as-camera button, .as-camera > span { flex-shrink: 0; }
+.as-hint { max-width: calc(100% - 100px); text-align: center; white-space: normal; }
+@media (max-width: 900px) {
+  .as-stage { height: clamp(480px, 62svh, 560px); min-height: 480px; }
+  .as-stage .avatar-view { inset: 58px 54px 78px 6px; }
+  .as-camera { top: 64px; bottom: 78px; max-height: calc(100% - 142px); }
+}

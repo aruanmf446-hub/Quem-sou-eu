@@ -28,6 +28,7 @@ export class AvatarStage {
   private props: THREE.Object3D[] = [];
   private destination = { pos: new THREE.Vector3(0, 1.1, 5), target: new THREE.Vector3(0, 1, 0), t: 1 };
   height = 1.8;
+  private currentFocus: CameraFocus = 'full';
 
   constructor(canvasHost: HTMLElement, opts: { transparent?: boolean; controls?: boolean; pixelRatio?: number; background?: string } = {}) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: !!opts.transparent, powerPreference: 'high-performance', preserveDrawingBuffer: false });
@@ -123,13 +124,15 @@ export class AvatarStage {
   }
 
   focus(view: CameraFocus, instant = false) {
+    this.currentFocus = view;
     this.follow = null;
     const h = this.height;
     const d = this.destination;
     const azimuth = view === 'back' ? Math.PI : .18;
+    const fullDistance = Math.max(2.75 * h, h * .65 / (Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2) * this.camera.aspect));
     const frames: Record<CameraFocus, [number, number, number]> = {
-      full: [h * .53, h * .5, 2.75 * h],
-      back: [h * .53, h * .5, 2.75 * h],
+      full: [h * .57, h * .54, fullDistance],
+      back: [h * .57, h * .54, fullDistance],
       face: [h * .925, h * .925, 1.0],
       eye: [h * .94, h * .94, .22],
       torso: [h * .72, h * .7, 1.75],
@@ -173,6 +176,7 @@ export class AvatarStage {
     // Em telas estreitas, abre o campo de visão para manter o corpo inteiro visível.
     this.camera.fov = w / h < .62 ? 34 : 28;
     this.camera.updateProjectionMatrix();
+    this.focus(this.currentFocus, true);
   }
 
   private follow: THREE.Vector3 | null = null;

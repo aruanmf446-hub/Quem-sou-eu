@@ -136,8 +136,22 @@ describe('montagem, proporções e animações', () => {
     const duration = CHOREOGRAPHIES[id].beats * 60 / CHOREOGRAPHIES[id].bpm;
     for (const t of [0, duration * .27, duration * .61]) {
       a.seek(id, t); b.seek(id, t);
-      for (const name of ['LeftArm', 'RightForeArm', 'Spine1', 'LeftUpLeg', 'RightLeg', 'Head']) {
-        expect(a.bones.get(name)!.quaternion.angleTo(b.bones.get(name)!.quaternion)).toBeLessThan(2e-3);
+      // Tronco e cabeça: mesma rotação; braços: mesma direção (ajuste de poucos graus às proporções).
+      for (const name of ['Spine1', 'Head']) expect(a.bones.get(name)!.quaternion.angleTo(b.bones.get(name)!.quaternion)).toBeLessThan(2e-3);
+      const dir = (av: Avatar, from: string, to: string) => {
+        av.root.updateMatrixWorld(true);
+        return av.bones.get(to)!.getWorldPosition(new THREE.Vector3()).sub(av.bones.get(from)!.getWorldPosition(new THREE.Vector3())).normalize();
+      };
+      for (const [from, to] of [['LeftArm', 'LeftForeArm'], ['RightForeArm', 'RightHand']]) expect(dir(a, from, to).angleTo(dir(b, from, to))).toBeLessThan(.05);
+      // Pernas resolvidas nas proporções de cada corpo: joelho sempre à frente e pé no chão.
+      for (const av of [a, b]) {
+        av.root.updateMatrixWorld(true);
+        for (const side of ['Left', 'Right']) {
+          const [hip, knee, ankle] = ['UpLeg', 'Leg', 'Foot'].map(n => av.bones.get(side + n)!.getWorldPosition(new THREE.Vector3()));
+          const u = (knee.y - hip.y) / (ankle.y - hip.y);
+          expect(knee.z - (hip.z + (ankle.z - hip.z) * u)).toBeGreaterThan(-.005);
+          expect(ankle.y).toBeGreaterThan(id === 'jump' ? .03 : .05);
+        }
       }
       const box = skinnedBounds(a);
       expect(box.getSize(new THREE.Vector3()).y).toBeGreaterThan(1.1);
@@ -170,4 +184,34 @@ describe('configuração do avatar', () => {
     expect(c.items.hair).toBe(BUNDLES[0].config.items.hair);
     expect(c.tints).toEqual({ b: '#112233' });
   });
+});
+
+describe('transições do estúdio', () => {
+  it('retorna a uma dança já tocada sem perder o peso da animação', async () => {
+    const avatar = new Avatar(await load('public/avatar/base.glb'));
+    for (const id of ['groove', 'samba', 'groove']) {
+      avatar.play(id);
+      for (let i = 0; i < 30; i++) avatar.update(1 / 30);
+      expect((avatar as any).current.action.getEffectiveWeight()).toBeCloseTo(1);
+    }
+  });
+  it('trocar proporções durante o fade não deixa o avatar misturado com a pose T', async () => {
+    const avatar = new Avatar(await load('public/avatar/base.glb'));
+    avatar.play('groove');
+    avatar.update(.03);
+    avatar.setShape({ body: { ...DEFAULT_BODY, height: .7 }, face: DEFAULT_FACE });
+    for (let i = 0; i < 30; i++) avatar.update(1 / 30);
+    expect((avatar as any).current.action.getEffectiveWeight()).toBeCloseTo(1);
+  });
+});
+
+it('oculta a parte da coxa coberta pelo saiote e restaura ao removê-lo', async () => {
+  const avatar = new Avatar(await load('public/avatar/base.glb'));
+  avatar.equip('bottom', 'bottom_shendyt', await load(itemPath('bottom_shendyt')));
+  const thighs: THREE.Object3D[] = [];
+  avatar.model.traverse(o => { if (o.userData.region === 'thigh_b') thighs.push(o); });
+  expect(thighs.length).toBeGreaterThan(0);
+  expect(thighs.every(o => !o.visible)).toBe(true);
+  avatar.equip('bottom', null);
+  expect(thighs.every(o => o.visible)).toBe(true);
 });

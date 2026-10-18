@@ -15,7 +15,7 @@ for (const [name, viewport, mobile] of [['desktop', { width: 1440, height: 900 }
   page.on('pageerror', e => errors.push(e.message));
   const ready = async () => {
     await page.waitForSelector('.as-root .avatar-view.is-ready', { timeout: 240000 });
-    await page.waitForFunction(() => !document.querySelector('.as-loading-pill'), null, { timeout: 240000 });
+    await page.waitForFunction(() => !document.querySelector('.avatar-view-swap'), null, { timeout: 240000 });
     await page.waitForTimeout(800);
   };
   const tab = n => page.getByRole('tab', { name: n }).click();

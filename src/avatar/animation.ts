@@ -73,17 +73,36 @@ const BASE_LEG: LegPose = { foot: [0, 0, 0], footRot: [0, 0, 0], knee: 0 };
 
 export interface RestBone { name: string; parent: string | null; head: THREE.Vector3; }
 
-/** Esqueleto de repouso lido da base (posições de mundo das juntas). */
+/**
+ * Esqueleto de repouso (posições das juntas com rotações identidade).
+ * Com `space`, as posições ficam no referencial desse objeto (ex.: o modelo do avatar),
+ * o que permite resolver as danças nas proporções de cada personagem.
+ */
 export class RestSkeleton {
   bones = new Map<string, RestBone>();
-  constructor(root: THREE.Object3D) {
+  constructor(root: THREE.Object3D, space?: THREE.Object3D) {
     root.updateMatrixWorld(true);
+    const inv = space ? space.matrixWorld.clone().invert() : null;
     root.traverse(o => {
       if ((o as THREE.Bone).isBone) {
         const parent = (o.parent as THREE.Bone)?.isBone ? o.parent!.name : null;
-        this.bones.set(o.name, { name: o.name, parent, head: o.getWorldPosition(new THREE.Vector3()) });
+        const head = o.getWorldPosition(new THREE.Vector3());
+        if (inv) head.applyMatrix4(inv);
+        this.bones.set(o.name, { name: o.name, parent, head });
       }
     });
+  }
+  /** Assinatura das proporções (milímetros): esqueletos iguais compartilham os clips compilados. */
+  signature() {
+    let out = '';
+    for (const b of this.bones.values()) if (!/Hand.+\d|Eye/.test(b.name)) out += `${Math.round(b.head.x * 1000)},${Math.round(b.head.y * 1000)},${Math.round(b.head.z * 1000)};`;
+    return out;
+  }
+  /** Comprimento das pernas (coxa + canela, média dos dois lados). */
+  legLength() {
+    let sum = 0;
+    for (const s of ['Left', 'Right']) sum += this.head(`${s}UpLeg`).distanceTo(this.head(`${s}Leg`)) + this.head(`${s}Leg`).distanceTo(this.head(`${s}Foot`));
+    return sum / 2;
   }
   head(name: string) { return this.bones.get(name)!.head; }
   dir(from: string, to: string) { return this.head(to).clone().sub(this.head(from)).normalize(); }
@@ -231,7 +250,8 @@ export class PoseSolver {
     const fwd = Z.clone().applyQuaternion(hipsQ).applyAxisAngle(Y, deg(s * (leg.knee ?? 0)));
     const bendAxis = new THREE.Vector3().crossVectors(dirT, fwd).normalize();
     const a = Math.acos(THREE.MathUtils.clamp((l1 * l1 + d * d - l2 * l2) / (2 * l1 * d), -1, 1));
-    const thighDir = dirT.clone().applyAxisAngle(bendAxis, -a);
+    // Gira a coxa para a frente (o joelho aponta para `fwd`).
+    const thighDir = dirT.clone().applyAxisAngle(bendAxis, a);
     const kneePos = hipJoint.clone().add(thighDir.clone().multiplyScalar(l1));
     const shinDir = hipJoint.clone().add(dirT.clone().multiplyScalar(d)).sub(kneePos).normalize();
     this.aim(`${side}UpLeg`, r.dir(`${side}UpLeg`, `${side}Leg`), thighDir);
@@ -329,8 +349,22 @@ export const FACE_MORPHS: Record<string, string> = {
 
 export interface CompiledClip { clip: THREE.AnimationClip; face: { times: Float32Array; values: Record<string, Float32Array> }; }
 
-/** Compila a coreografia em um AnimationClip (30 quadros/s). */
-export function compile(c: Choreography, rest: RestSkeleton, fps = 30): CompiledClip {
+/**
+ * Compila a coreografia em um AnimationClip (30 quadros/s) para um esqueleto.
+ * Deslocamentos do quadril e dos pés são escalados pelo comprimento da perna em relação ao
+ * esqueleto-padrão (`refLeg`): baixinhos e altos fazem a mesma dobra de joelho, com pés plantados.
+ */
+export function compile(c: Choreography, rest: RestSkeleton, fps = 30, refLeg = rest.legLength()): CompiledClip {
+  const k = refLeg > 0 ? rest.legLength() / refLeg : 1;
+  const scaled = (p: Pose): Pose => {
+    const out = { ...p };
+    if (p.hips) out.hips = [p.hips[0] * k, p.hips[1] * k, p.hips[2] * k];
+    for (const side of ['legL', 'legR'] as const) {
+      const leg = p[side];
+      if (leg) out[side] = { ...leg, foot: [leg.foot[0] * k, leg.foot[1] * k, leg.foot[2] * k] };
+    }
+    return out;
+  };
   const solver = new PoseSolver(rest);
   const duration = c.beats * 60 / c.bpm;
   const frames = Math.max(2, Math.round(duration * fps) + 1);
@@ -345,7 +379,7 @@ export function compile(c: Choreography, rest: RestSkeleton, fps = 30): Compiled
   for (let i = 0; i < frames; i++) {
     const t = i / (frames - 1) * duration;
     times[i] = t;
-    const pose = samplePose(c, t * c.bpm / 60);
+    const pose = scaled(samplePose(c, t * c.bpm / 60));
     solver.solve(pose);
     for (const [name, q] of solver.out) {
       let arr = quats.get(name);

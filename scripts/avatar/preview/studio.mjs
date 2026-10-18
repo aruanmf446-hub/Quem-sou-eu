@@ -12,7 +12,7 @@ for (const [name, viewport, mobile] of [['desktop', { width: 1440, height: 900 }
   await page.click('.splash');
   await page.getByRole('button', { name: 'Estúdio 3D' }).click();
   await page.waitForSelector('.as-root .avatar-view.is-ready', { timeout: 240000 });
-  await page.waitForFunction(() => !document.querySelector('.as-loading-pill'), null, { timeout: 240000 }).catch(() => {});
+  await page.waitForFunction(() => !document.querySelector('.avatar-view-swap'), null, { timeout: 240000 }).catch(() => {});
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `${prefix}-${name}.png` });
   if (script) { const fn = new Function('page', 'name', 'prefix', `return (async () => { ${script} })()`); await fn(page, name, prefix); }
