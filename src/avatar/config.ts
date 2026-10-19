@@ -92,10 +92,13 @@ const pair = (v: number, up: string, down: string, out: Record<string, number>, 
 export function restExpression(face: Partial<FaceConfig>): Record<string, number> {
   const smile = clamp(face.smile ?? 0, 0, 1), squint = clamp(face.squint ?? 0, 0, 1), mood = clamp(face.browMood ?? 0);
   return {
-    expr_smile: smile * .75, expr_grin: smile * .3, expr_squint: squint * .7 + smile * .15,
+    expr_smile: smile * .75, expr_grin: smile * .3, expr_squint: squint * .45 + smile * .05,
     expr_brows_up: Math.max(0, mood) * .7, expr_brows_down: Math.max(0, -mood) * .7,
   };
 }
+
+/** Deslocamento aplicado a todos os rostos para o estilo animação (valores de slider, -1..1). */
+export const CARTOON_FACE = { eyeSize: .35, eyeShape: .3, noseWidth: -.15, noseLength: -.3, jaw: -.3, cheeks: .2, age: -.3, noseBridge: -.35, chin: -.1 };
 
 /** Converte a configuração em influências dos morph targets compartilhados. */
 export function morphInfluences(config: Pick<AvatarConfig, 'body' | 'face'>): Record<string, number> {
@@ -121,15 +124,19 @@ export function morphInfluences(config: Pick<AvatarConfig, 'body' | 'face'>): Re
   // que produzia expressões estranhas e olhos muito pequenos.
   out.style_toon = .72 + clamp(b.style ?? 0, 0, 1) * .28;
   if (f.shape !== 'natural') out[`face_${f.shape}`] = clamp(f.shapeAmount, 0, 1);
+  // Base de animação: todo rosto parte de olhos maiores e redondos, nariz pequeno e arredondado,
+  // mandíbula suave, bochechas cheias e aparência jovem. Os sliders continuam somando por cima,
+  // então cada personagem mantém o próprio rosto, só que dentro do estilo das artes de referência.
+  const toon = CARTOON_FACE;
   pair(clamp(f.width), 'face_wide', 'face_narrow', out);
-  pair(clamp(f.jaw), 'jaw_strong', 'jaw_soft', out);
-  pair(clamp(f.chin), 'chin_forward', 'chin_back', out);
+  pair(clamp(f.jaw + toon.jaw), 'jaw_strong', 'jaw_soft', out);
+  pair(clamp(f.chin + toon.chin), 'chin_forward', 'chin_back', out);
   pair(clamp(f.cheekbones), 'cheekbones_high', 'cheekbones_low', out);
-  pair(clamp(f.eyeSize), 'eyes_big', 'eyes_small', out, .8);
+  pair(clamp(f.eyeSize + toon.eyeSize), 'eyes_big', 'eyes_small', out, .8);
   pair(clamp(f.eyeDistance), 'eyes_apart', 'eyes_close', out, .8);
   pair(clamp(f.eyeTilt), 'eyes_up', 'eyes_down', out);
-  pair(clamp(f.noseWidth), 'nose_wide', 'nose_narrow', out);
-  pair(clamp(f.noseLength), 'nose_long', 'nose_short', out);
+  pair(clamp(f.noseWidth + toon.noseWidth), 'nose_wide', 'nose_narrow', out);
+  pair(clamp(f.noseLength + toon.noseLength), 'nose_long', 'nose_short', out);
   pair(clamp(f.noseTip), 'nose_tip_up', 'nose_tip_down', out);
   pair(clamp(f.lips), 'lips_full', 'lips_thin', out);
   pair(clamp(f.mouthWidth), 'mouth_wide', 'mouth_narrow', out);
@@ -137,10 +144,10 @@ export function morphInfluences(config: Pick<AvatarConfig, 'body' | 'face'>): Re
   pair(clamp(f.browAngle), 'brows_angle_up', 'brows_angle_down', out);
   pair(clamp(f.ears), 'ears_big', 'ears_small', out);
   if (f.earShape > 0) out.ears_pointed = clamp(f.earShape, 0, 1);
-  pair(clamp(f.cheeks ?? 0), 'cheeks_full', 'cheeks_hollow', out);
-  pair(clamp(f.eyeShape ?? 0), 'eyes_round', 'eyes_almond', out);
-  pair(clamp(f.age ?? 0), 'face_mature', 'face_young', out);
-  pair(clamp(f.noseBridge ?? 0), 'nose_aquiline', 'nose_button', out);
+  pair(clamp((f.cheeks ?? 0) + toon.cheeks), 'cheeks_full', 'cheeks_hollow', out);
+  pair(clamp((f.eyeShape ?? 0) + toon.eyeShape), 'eyes_round', 'eyes_almond', out);
+  pair(clamp((f.age ?? 0) + toon.age), 'face_mature', 'face_young', out);
+  pair(clamp((f.noseBridge ?? 0) + toon.noseBridge), 'nose_aquiline', 'nose_button', out);
   pair(clamp(f.mouthCorners ?? 0), 'mouth_corners_up', 'mouth_corners_down', out);
   pair(clamp(f.faceLength ?? 0), 'face_long', 'face_short', out);
   return out;

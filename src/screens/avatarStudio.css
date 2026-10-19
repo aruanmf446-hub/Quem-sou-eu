@@ -20,12 +20,13 @@
 .as-root button { font-family: var(--body); letter-spacing: 0; }
 
 /* Palco */
-.as-stage { position: relative; min-height: 0; overflow: hidden; isolation: isolate; background: radial-gradient(120% 90% at 50% 18%, color-mix(in srgb, var(--accent) 22%, #121a2b) 0%, #0b101b 48%, #06080e 100%); }
+.as-stage { position: relative; min-height: 0; overflow: hidden; isolation: isolate; background: radial-gradient(120% 90% at 50% 30%, #eceef2 0%, #d3d6dc 55%, #b9bdc5 100%); }
 .as-stage.mood-arena { background: radial-gradient(120% 90% at 50% 18%, #134a3e 0%, #0a1a18 50%, #050b0a 100%); }
 .as-stage.mood-midnight { background: radial-gradient(120% 90% at 50% 18%, #4a1736 0%, #170b1c 50%, #07050b 100%); }
 .as-stage-bg { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
 .as-stage-bg i:first-child { position: absolute; left: 50%; top: 4%; width: min(70vh, 640px); aspect-ratio: 1; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--accent) 30%, transparent) 0%, transparent 62%); filter: blur(10px); opacity: .7; }
-.as-stage-bg i:last-child { position: absolute; inset: auto 0 0 0; height: 38%; background: linear-gradient(180deg, transparent, #0000008c); }
+.as-stage-bg i:last-child { position: absolute; inset: auto 0 0 0; height: 38%; background: linear-gradient(180deg, transparent, #0000001f); }
+.as-stage.mood-arena .as-stage-bg i:last-child, .as-stage.mood-midnight .as-stage-bg i:last-child { background: linear-gradient(180deg, transparent, #0000008c); }
 .as-stage .avatar-view { position: absolute; inset: 0; }
 .as-stage-top { position: absolute; top: 18px; left: 22px; right: 22px; display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none; }
 .as-kicker { display: block; font-size: 11px; font-weight: 800; letter-spacing: .22em; color: var(--accent); }
@@ -230,3 +231,4 @@
   .as-stage .avatar-view { inset: 58px 54px 78px 6px; }
   .as-camera { top: 64px; bottom: 78px; max-height: calc(100% - 142px); }
 }
+.as-stage:not(.mood-arena):not(.mood-midnight) .as-hint { color: #1b1f2a8c; }

@@ -3,7 +3,7 @@ import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { morphInfluences, restExpression, type AvatarConfig } from './config';
-import { applyHairTips, makeSkinMaterial, skinToneColors, stylize, type SkinUniforms } from './materials';
+import { applyHairTips, makeIrisMaterial, makeSkinMaterial, skinToneColors, stylize, type SkinUniforms } from './materials';
 import { compile, PoseSolver, RestSkeleton, sampleFace, type CompiledClip } from './animation';
 import { CHOREOGRAPHIES } from './dances';
 import { versioned } from './catalog';
@@ -142,20 +142,8 @@ export class Avatar {
           if (!skin) { skin = makeSkinMaterial(material, this.skinUniforms); skinMaterials.set(material, skin); this.skinMaterials.push(skin as THREE.MeshPhysicalMaterial); }
           mesh.material = skin;
         } else if (material.userData.irisColor) {
-          const iris = material.clone();
-          if (material.userData.catchlight) {
-            // Reflexo branco desenhado na textura (valores acima de 0,9) não recebe a cor da íris.
-            iris.onBeforeCompile = shader => {
-              shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', `
-#ifdef USE_MAP
-  vec4 irisTexel = texture2D( map, vMapUv );
-  float glint = smoothstep( 0.88, 0.97, irisTexel.r );
-  diffuseColor.rgb = mix( diffuseColor.rgb * irisTexel.rgb, vec3( 1.0 ), glint );
-  totalEmissiveRadiance += glint * 0.6;
-#endif`).replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>');
-            };
-            iris.customProgramCacheKey = () => 'avatar-iris-glint';
-          }
+          // Íris com pupila, gradiente, anel límbico e reflexos desenhados por shader.
+          const iris = makeIrisMaterial(material);
           mesh.material = iris;
           this.irisMaterials.push(iris as THREE.MeshStandardMaterial);
         } else if (material.userData.cornea) {
@@ -260,7 +248,7 @@ export class Avatar {
     this.feminine = config.body.type;
     this.toon = true; // olhos com íris grande em todos os avatares cartoon, inclusive perfis antigos
     // Estilo animação: pele mais lisa (menos poros) e bochechas levemente coradas.
-    const smooth = 1 - .8 * (.72 + .28 * Math.min(1, Math.max(0, config.body.style ?? 0)));
+    const smooth = .12 - .08 * Math.min(1, Math.max(0, config.body.style ?? 0));
     for (const m of this.skinMaterials) {
       const base = (m.userData.baseNormalScale as THREE.Vector2 | undefined) ?? (m.userData.baseNormalScale = m.normalScale.clone());
       m.normalScale.copy(base).multiplyScalar(smooth);
@@ -320,6 +308,9 @@ export class Avatar {
       const tint = material.userData.tint as string | undefined;
       if (material.userData.hair) {
         this.addTint(`hair:${id}`, material);
+        // Cabelo menos plástico: especular espalhado e pouco reflexo de ambiente.
+        material.roughness = Math.max(material.roughness, .62);
+        material.envMapIntensity = .3;
         if (material.userData.tips) applyHairTips(material, this.hairTips, this.hairTipAmount);
       } else if (material.userData.hairColor === 'brows') {
         this.addTint(`hair:brows:${id}`, material);

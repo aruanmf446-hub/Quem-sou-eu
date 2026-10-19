@@ -19,8 +19,10 @@ export function makeSkinMaterial(source: THREE.MeshStandardMaterial, uniforms: S
   THREE.MeshStandardMaterial.prototype.copy.call(m, source);
   m.metalness = 0;
   m.metalnessMap = null;
-  m.sheen = .2;
-  m.sheenRoughness = .55;
+  // Pele de animação: mais fosca e lisa (sem aspecto de plástico nem ruído de poros).
+  m.roughness = Math.max(source.roughness, .62);
+  m.sheen = .32;
+  m.sheenRoughness = .6;
   m.sheenColor = new THREE.Color('#e8d6cf');
   m.name = source.name;
   const ormMap = source.roughnessMap;
@@ -65,7 +67,8 @@ export function skinToneColors(hex: string) {
  * As pontas descoloridas combinam o atributo _TIP (0 raiz -> 1 ponta) e a máscara da textura.
  */
 export function applyHairTips(m: THREE.MeshStandardMaterial, tips: { value: THREE.Color }, amount: { value: number }) {
-  m.envMapIntensity = .55;
+  // Brilho de cabelo macio: menos reflexo de ambiente e especular mais espalhado (sem aspecto de plástico).
+  m.envMapIntensity = .3;
   m.onBeforeCompile = shader => {
     shader.uniforms.hairTips = tips;
     shader.uniforms.hairTipAmount = amount;
@@ -101,12 +104,12 @@ export function applyHairTips(m: THREE.MeshStandardMaterial, tips: { value: THRE
  */
 export const TOON = {
   rimColor: { value: new THREE.Color('#bcc8ff') },
-  rim: { value: .38 },
-  rimPower: { value: 2.6 },
-  wrap: { value: .45 },
-  soft: { value: .55 },
-  saturation: { value: 1.12 },
-  floor: { value: .8 },
+  rim: { value: .26 },
+  rimPower: { value: 3.0 },
+  wrap: { value: .6 },
+  soft: { value: .75 },
+  saturation: { value: 1.06 },
+  floor: { value: .9 },
   height: { value: 1.7 },
 };
 
@@ -153,4 +156,45 @@ export function stylize(m: THREE.Material) {
   };
   m.customProgramCacheKey = () => `${prevKey ? prevKey.call(m) : ''}|toon`;
   m.needsUpdate = true;
+}
+
+/**
+ * Íris de animação gerada por código (sem textura nova): a malha da íris tem UV centrado em (0,5; 0,5),
+ * com raio 0,5 na borda. O shader desenha pupila, gradiente radial (centro claro, borda escura),
+ * anel límbico, fibras sutis e dois reflexos fixos (catchlight), como nos olhos de filmes de animação.
+ */
+export function makeIrisMaterial(source: THREE.MeshStandardMaterial) {
+  const m = source.clone();
+  m.roughness = .25;
+  m.onBeforeCompile = shader => {
+    shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', `
+#ifdef USE_MAP
+  vec2 irisUv = vMapUv - 0.5;
+#else
+  vec2 irisUv = vec2( 0.0 );
+#endif
+  float irisR = length( irisUv ) * 2.0;
+  float irisAng = atan( irisUv.y, irisUv.x );
+  vec3 irisBase = diffuseColor.rgb;
+  // Gradiente: centro mais claro e quente, borda mais escura.
+  vec3 irisInner = irisBase * vec3( 1.8, 1.55, 1.25 );
+  vec3 irisOuter = irisBase * 0.45;
+  vec3 irisCol = mix( irisInner, irisOuter, smoothstep( 0.3, 0.95, irisR ) );
+  // Fibras radiais sutis.
+  irisCol *= 0.9 + 0.1 * sin( irisAng * 38.0 + irisR * 6.0 );
+  // Metade de baixo um pouco mais clara (luz entrando pelo topo da córnea).
+  irisCol *= 1.0 + 0.25 * smoothstep( 0.0, 0.4, irisUv.y );
+  // Anel límbico escuro na borda.
+  irisCol *= 1.0 - 0.75 * smoothstep( 0.82, 0.98, irisR );
+  // Pupila.
+  irisCol = mix( irisCol, vec3( 0.015 ), 1.0 - smoothstep( 0.34, 0.4, irisR ) );
+  // Reflexos fixos: um grande no alto à esquerda e um pequeno embaixo à direita.
+  float glint = 1.0 - smoothstep( 0.07, 0.1, length( irisUv - vec2( -0.15, -0.16 ) ) );
+  glint = max( glint, ( 1.0 - smoothstep( 0.025, 0.04, length( irisUv - vec2( 0.17, 0.15 ) ) ) ) * 0.8 );
+  diffuseColor.rgb = mix( irisCol, vec3( 1.0 ), glint );
+  float irisGlint = glint;`).replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+  totalEmissiveRadiance += irisGlint * 0.9;`);
+  };
+  m.customProgramCacheKey = () => 'avatar-iris-toon-v2';
+  return m;
 }
