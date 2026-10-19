@@ -21,7 +21,11 @@ type Screen =
 
 export function App() {
   const profile = useProfile();
-  const [screen, setScreen] = useState<Screen>({ name: 'splash' });
+  const [screen, setScreen] = useState<Screen>(() =>
+    new URLSearchParams(window.location.search).get('studio') === '1'
+      ? { name: 'menu', tab: 'studio' }
+      : { name: 'splash' },
+  );
 
   useEffect(() => {
     audio.setMusicVolume(profile.settings.music);

@@ -36,3 +36,18 @@ Defina `VITE_ASSETS_BASE_URL` e suba os arquivos seguindo [docs/ASSETS.md](docs/
 ## Estúdio 3D
 
 Abra **Estúdio 3D** para criar seu personagem (corpo, rosto, pele, cabelo), vestir roupas, calçados e acessórios, escolher danças e comemorações, comprar com moedas e salvar combinações. O avatar equipado dança no lobby, aparece na partida e comemora na vitória. Para o modo online, aplique também `supabase/migrations/20261017200000_avatar_creator.sql`. Detalhes, arquitetura e limites em [docs/CHARACTER_STUDIO.md](docs/CHARACTER_STUDIO.md); pipeline de assets e licenças em [scripts/avatar/README.md](scripts/avatar/README.md).
+
+## Testar sem consumir Vercel (GitHub Pages)
+
+O projeto publica uma versão de teste estática pelo workflow `pages-preview.yml`, usando
+GitHub Actions e os mesmos modelos GLB do repositório. O Vercel continua independente.
+
+- Site: https://aruanmf446-hub.github.io/Quem-sou-eu/
+- Abrir diretamente o Estúdio 3D: https://aruanmf446-hub.github.io/Quem-sou-eu/?studio=1
+
+Na primeira publicação, se Pages ainda não estiver habilitado, entre em
+**Settings → Pages → Build and deployment → Source: GitHub Actions** e salve.
+Depois confira em **Actions → Publicar teste no GitHub Pages**.
+
+O build de teste não recebe credenciais de Supabase: jogo offline e Estúdio 3D podem
+ser avaliados, mas salas online e dados reais exigem configuração própria.

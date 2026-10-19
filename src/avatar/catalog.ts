@@ -257,6 +257,11 @@ export const EYE_COLORS = ['#2a1810', '#4a2c1a', '#6b4423', '#7a5a2a', '#4f6b3a'
 export const OUTFIT_COLORS = ['#f2f2ee', '#1e2230', '#2d3442', '#7c5ce0', '#efc51d', '#169a4a', '#1f2c66', '#e65068', '#2f7ad8', '#d9481c', '#c2b9a4', '#111111'];
 
 /** URL com a versão do conteúdo (evita misturar arquivos novos e antigos em cache). */
-export const versioned = (path: string) => { const v = (ASSET_VERSIONS as Record<string, string>)[path]; return v ? `${path}?v=${v}` : path; };
+export const versioned = (path: string) => {
+  const v = (ASSET_VERSIONS as Record<string, string>)[path];
+  // Preserva as chaves do cache, mas respeita a subpasta do GitHub Pages.
+  const url = `${import.meta.env.BASE_URL}${path.replace(/^\/+/, '')}`;
+  return v ? `${url}?v=${v}` : url;
+};
 export const itemUrl = (id: string) => versioned(`/avatar/items/${id}.glb`);
 export const thumbUrl = (id: string) => versioned(`/avatar/thumbs/${id}.webp`);
