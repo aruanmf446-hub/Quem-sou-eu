@@ -5,13 +5,9 @@ on:
     branches: [main]
     paths:
       - 'scripts/avatar/*.py'
-      - 'src/avatar/stage.ts'
-      - 'src/avatar/Avatar.ts'
-      - 'src/avatar/AvatarView.tsx'
-      - 'src/avatar/config.ts'
-      - 'src/avatar/catalog.ts'
-      - 'src/screens/AvatarStudio.tsx'
-      - 'scripts/avatar/preview/**'
+      - 'scripts/avatar/*.mjs'
+      - 'scripts/avatar/requirements.txt'
+      # Alterações de runtime, estúdio e shader não exigem recriar todos os GLBs.
       - '.github/workflows/avatar-cinematico.yml'
   workflow_dispatch:
 
@@ -81,33 +77,43 @@ jobs:
           node scripts/avatar/preview/shoot.mjs art-direction/camisa10/depois-corpo.png 'bundle=striker&fit=all&pad=1.09&az=.3&el=.07' 780 1060
           node scripts/avatar/preview/shoot.mjs art-direction/camisa10/depois-rosto.png 'bundle=striker&view=face' 780 980
           node scripts/avatar/preview/shoot.mjs art-direction/camisa10/depois-danca.png 'bundle=striker&anim=samba&t=.8&view=full' 780 1060
-      - name: Comprovar diferenças reais nos GLBs
+      - name: Conferir integridade e identificar GLBs realmente modificados
         run: |
           python - <<'PY'
-          import os, subprocess
+          import subprocess
           from pathlib import Path
           for item in ['base.glb', 'items/hair_spiky.glb', 'items/top_lab_coat.glb']:
               p = Path('public/avatar') / item
-              if not p.exists() or p.stat().st_size < 1024:
+              if not p.is_file() or p.stat().st_size < 1024:
                   raise SystemExit(f'GLB ausente ou vazio: {p}')
-              original = subprocess.check_output(['git', 'show', 'HEAD:' + str(p)])
-              atual = p.read_bytes()
-              if atual == original:
-                  raise SystemExit(f'Malha não mudou: {p}')
-              print(f'Geometria alterada: {p} ({len(original)} -> {len(atual)} bytes)')
+              result = subprocess.run(['git', 'diff', '--quiet', '--', str(p)], check=False)
+              if result.returncode not in (0, 1):
+                  raise SystemExit(f'Não foi possível verificar o GLB: {p}')
+              print(f'{p}: ' + ('nova malha' if result.returncode == 1 else 'idêntico à versão publicada — OK'))
           PY
-      - name: Verificar se a escultura realmente mudou os rostos
+      - name: Validar diferença do rosto somente quando a malha correspondente mudou
         run: |
           python - <<'PY'
+          import subprocess
           import numpy as np
           from PIL import Image
-          for folder in ('volt', 'camisa10'):
+          def modified(path):
+              code = subprocess.run(['git', 'diff', '--quiet', '--', f'public/avatar/{path}'], check=False).returncode
+              if code not in (0, 1): raise SystemExit(f'Erro comparando {path}')
+              return code == 1
+          base = modified('base.glb')
+          changed = {
+              'volt': base or modified('items/hair_spiky.glb'),
+              'camisa10': base or modified('items/hair_curly_fade.glb'),
+          }
+          for folder, needs_change in changed.items():
               a = np.asarray(Image.open(f'art-direction/{folder}/antes-rosto.png').convert('RGB'), np.float32)
               b = np.asarray(Image.open(f'art-direction/{folder}/depois-rosto.png').convert('RGB'), np.float32)
-              change = float(np.abs(a-b).mean())
-              print(f'{folder}: diferença média do retrato {change:.2f}/255')
-              if change < 1.3:
-                  raise SystemExit(f'Escultura sem diferença perceptível no retrato: {folder}')
+              if a.shape != b.shape: raise SystemExit(f'Fotos incompatíveis: {folder}')
+              score = float(np.abs(a-b).mean())
+              print(f'{folder}: diferença média {score:.2f}/255; nova malha facial = {needs_change}')
+              if needs_change and score < 1.3:
+                  raise SystemExit(f'Malha facial alterada sem diferença perceptível: {folder}')
           PY
       - name: Testar fluxo real do jogador em desktop e celular
         run: node scripts/avatar/preview/e2e.mjs art-direction/volt/teste
@@ -120,8 +126,13 @@ jobs:
             art-direction/volt/*.png
             art-direction/camisa10/*.png
           if-no-files-found: warn
-      - name: Publicar assets e capturas aprovados na main
+      - name: Publicar somente se os assets realmente mudaram
         run: |
+          # Sem geometria nova, não gerar commit apenas por ruído nas imagens.
+          if git diff --quiet -- public/avatar/base.glb public/avatar/items; then
+            echo "GLBs já publicados correspondem ao gerador. Sem commit adicional."
+            exit 0
+          fi
           git config user.name "Pipeline do Estúdio 3D"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add public/avatar/base.glb public/avatar/items public/avatar/thumbs src/avatar/assetVersions.json art-direction/volt art-direction/camisa10
